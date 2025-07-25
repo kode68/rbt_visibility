@@ -1,9 +1,13 @@
-// src/App.jsx
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { useAuthState } from "react-firebase-hooks/auth";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import Logs from "./pages/Logs";
+import { auth } from "./firebase";
+import ManageUsers from "./pages/ManageUsers";
 
 export default function App() {
   return (
@@ -13,7 +17,10 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/logs" element={<AdminOnly><Logs /></AdminOnly>} />
+        <Route path="/manage-users" element={<ManageUsers />} />
       </Routes>
+      <Toaster position="top-center" />
     </Router>
   );
 }
@@ -49,4 +56,19 @@ function Welcome() {
       </div>
     </div>
   );
+}
+
+// ✅ Admin-only wrapper using inline logic
+function AdminOnly({ children }) {
+  const [user, loading] = useAuthState(auth);
+
+  if (loading) return null;
+
+  const isAdmin = user?.email?.endsWith("@brightbots.in");
+
+  if (!user || !user.emailVerified || !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 }

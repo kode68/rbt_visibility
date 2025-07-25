@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
+import { logAndUpdateField } from "../utils/db";
 
 const ALL_PARTS = [
     "ANTENA CABLE", "ANTENA PORT", "BATTERY", "BATTERY BOX", "BATTTERY", "BRUSH MOTOR",
@@ -7,10 +10,9 @@ const ALL_PARTS = [
     "SS PIPE", "SSC", "STEPPER DRIVE", "STEPPER MOTOR", "TC BELT", "TC Load Wheel", "XBEE"
 ];
 
-const PartIssueSection = ({ rbtId, rbt }) => {
+const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
     const [selectedParts, setSelectedParts] = useState({});
 
-    // Prefill from Firestore (rbt.part_issues)
     useEffect(() => {
         if (rbt?.part_issues) {
             const initial = {};
@@ -23,30 +25,64 @@ const PartIssueSection = ({ rbtId, rbt }) => {
                 }
             }
             setSelectedParts(initial);
+            onPartIssueChange(initial);
         }
-    }, [rbt]);
+    }, [rbt, onPartIssueChange]); // ✅ Fixed dependency warning
 
-    const togglePart = (part) => {
-        setSelectedParts((prev) => ({
-            ...prev,
-            [part]: prev[part]
-                ? undefined
-                : { dispatch_date: "", delivery_date: "" }
-        }));
+    const rbtRef = doc(db, "sites", site, "rbts", rbtId);
+
+    const togglePart = async (part) => {
+        const updated = { ...selectedParts };
+        if (selectedParts[part]) {
+            delete updated[part];
+            await updateDoc(rbtRef, {
+                [`part_issues.${part}`]: {
+                    dispatch_date: "",
+                    delivery_date: ""
+                },
+                last_updated: serverTimestamp()
+            });
+            await logAndUpdateField(site, rbtId, `part_issues.${part}`, selectedParts[part], null);
+        } else {
+            updated[part] = { dispatch_date: "", delivery_date: "" };
+            await updateDoc(rbtRef, {
+                [`part_issues.${part}`]: {
+                    dispatch_date: "",
+                    delivery_date: ""
+                },
+                last_updated: serverTimestamp()
+            });
+            await logAndUpdateField(site, rbtId, `part_issues.${part}`, null, updated[part]);
+        }
+
+        setSelectedParts(updated);
+        onPartIssueChange(updated);
     };
 
-    const updateDate = (part, field, value) => {
-        setSelectedParts((prev) => ({
-            ...prev,
-            [part]: { ...prev[part], [field]: value }
-        }));
+    const updateDate = async (part, field, value) => {
+        const prev = selectedParts[part]?.[field] || "";
+        const updated = {
+            ...selectedParts,
+            [part]: {
+                ...selectedParts[part],
+                [field]: value
+            }
+        };
+        setSelectedParts(updated);
+        onPartIssueChange(updated);
+
+        await updateDoc(rbtRef, {
+            [`part_issues.${part}.${field}`]: value,
+            last_updated: serverTimestamp()
+        });
+
+        await logAndUpdateField(site, rbtId, `part_issues.${part}.${field}`, prev, value);
     };
 
     return (
         <div className="bg-gray-100 p-4 rounded-xl shadow-sm">
             <h3 className="text-md font-semibold mb-3 text-gray-800 border-b pb-1">Part Issue Section</h3>
 
-            {/* Checkbox List */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 max-h-44 overflow-y-auto pr-2 mb-4">
                 {ALL_PARTS.map((part) => (
                     <label key={part} className="flex items-center space-x-2 text-sm">

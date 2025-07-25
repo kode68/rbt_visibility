@@ -1,14 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import React, { useState, useEffect, useCallback } from "react";
+import { doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { logAndUpdateField } from "../utils/db";
 import PartIssueSection from "./PartIssueSection";
 
 const RBTCard = ({ site, rbt }) => {
-    console.log("Rendering RBTCard for:", rbt);
     const [breakdownStatus, setBreakdownStatus] = useState(rbt?.breakdown_status || "N/A");
     const [runningStatus, setRunningStatus] = useState(rbt?.running_status || "Auto");
     const [work, setWork] = useState(rbt?.work || "");
+    const [partIssues, setPartIssues] = useState(rbt?.part_issues || {});
+    const [editableFields, setEditableFields] = useState({
+        cleaner_did: rbt?.cleaner_did || "",
+        tc_did: rbt?.tc_did || "",
+        cl_pcb_model: rbt?.cl_pcb_model || "",
+        tc_pcb_model: rbt?.tc_pcb_model || "",
+    });
+
     const [showParts, setShowParts] = useState(false);
+    const userEmail = auth.currentUser?.email;
+    const isAdmin = userEmail?.endsWith("@brightbots.in");
+    const isSuperAdmin = userEmail === "mis@brightbots.in";
+
+    const rbtRef = doc(db, "sites", site, "rbts", rbt.rbt_id);
+
+    const hasActiveParts = Object.values(partIssues || {}).some(
+        (p) => p?.dispatch_date || p?.delivery_date
+    );
 
     useEffect(() => {
         const show =
@@ -17,22 +34,9 @@ const RBTCard = ({ site, rbt }) => {
         setShowParts(show);
     }, [breakdownStatus, runningStatus]);
 
-    if (!rbt || !rbt.rbt_id) return null; // ✅ This is now safe, after hooks
-
-    const rbtRef = doc(db, "sites", site, "rbts", rbt.rbt_id);
-    const today = new Date().toISOString().split("T")[0];
-    const logRef = doc(db, "sites", site, "rbts", rbt.rbt_id, "history", today);
-
-    const logChange = async (field, oldValue, newValue) => {
-        const logEntry = {
-            [`${field}`]: {
-                old: oldValue,
-                new: newValue,
-                updated_at: serverTimestamp()
-            }
-        };
-        await setDoc(logRef, logEntry, { merge: true });
-    };
+    const handlePartIssueChange = useCallback((updated) => {
+        setPartIssues(updated);
+    }, []);
 
     const handleUpdate = async (field, newValue) => {
         const oldValue = {
@@ -46,22 +50,72 @@ const RBTCard = ({ site, rbt }) => {
             last_updated: serverTimestamp()
         });
 
-        await logChange(field, oldValue, newValue);
+        await logAndUpdateField(site, rbt.rbt_id, field, oldValue, newValue);
 
         if (field === "running_status") setRunningStatus(newValue);
         if (field === "breakdown_status") setBreakdownStatus(newValue);
         if (field === "work") setWork(newValue);
     };
 
-    return (
-        <div className="bg-white p-4 rounded-xl shadow-md hover:shadow-lg transition w-full">
-            <h2 className="text-xl font-bold text-blue-700 mb-2">{rbt.rbt_id}</h2>
+    const handleFieldEdit = async (field, value) => {
+        const oldValue = editableFields[field];
+        const updatedFields = { ...editableFields, [field]: value };
+        setEditableFields(updatedFields);
 
-            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                <p><strong>Cleaner ID:</strong> {rbt.cleaner_did}</p>
-                <p><strong>TC ID:</strong> {rbt.tc_did}</p>
-                <p><strong>CL PCB:</strong> {rbt.cl_pcb_model}</p>
-                <p><strong>TC PCB:</strong> {rbt.tc_pcb_model}</p>
+        await updateDoc(rbtRef, {
+            [field]: value,
+            last_updated: serverTimestamp()
+        });
+
+        await logAndUpdateField(site, rbt.rbt_id, field, oldValue, value);
+    };
+
+    const deleteRBT = async () => {
+        if (!window.confirm("Are you sure you want to delete this RBT? This action is irreversible.")) return;
+        await deleteDoc(rbtRef);
+        alert(`${rbt.rbt_id} deleted successfully.`);
+        window.location.reload(); // force refresh
+    };
+
+    if (!rbt || !rbt.rbt_id) return null;
+
+    return (
+        <div
+            className={`p-4 rounded-xl shadow-md transition-all w-full ${hasActiveParts ? "bg-red-100 border border-red-400" : "bg-white"
+                } hover:shadow-lg`}
+        >
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-extrabold text-blue-800 mb-3 tracking-tight">
+                    🦿 {rbt.rbt_id.replace(/RBT/, "RBT ")}
+                </h2>
+                {isSuperAdmin && (
+                    <button
+                        onClick={deleteRBT}
+                        className="text-xs bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700"
+                    >
+                        Delete
+                    </button>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm mb-4 text-gray-700">
+                {["cleaner_did", "tc_did", "cl_pcb_model", "tc_pcb_model"].map((field) => (
+                    <div key={field}>
+                        <label className="font-semibold block capitalize">
+                            {field.replace(/_/g, " ").toUpperCase()}:
+                        </label>
+                        {isAdmin ? (
+                            <input
+                                type="text"
+                                value={editableFields[field]}
+                                onChange={(e) => handleFieldEdit(field, e.target.value)}
+                                className="input w-full mt-1"
+                            />
+                        ) : (
+                            <p>{editableFields[field]}</p>
+                        )}
+                    </div>
+                ))}
             </div>
 
             <div className="space-y-3 text-sm">
@@ -112,9 +166,13 @@ const RBTCard = ({ site, rbt }) => {
             </div>
 
             {showParts && (
-                <div className="mt-4">
-                    <PartIssueSection site={site} rbtId={rbt.rbt_id} rbt={rbt} />
-
+                <div className="mt-5">
+                    <PartIssueSection
+                        site={site}
+                        rbtId={rbt.rbt_id}
+                        rbt={rbt}
+                        onPartIssueChange={handlePartIssueChange}
+                    />
                 </div>
             )}
         </div>

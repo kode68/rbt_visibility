@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { useNavigate, Link } from "react-router-dom";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -16,11 +17,27 @@ function Login() {
     setLoading(true);
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      if (!userCred.user.emailVerified) {
+      const user = userCred.user;
+
+      if (!user.emailVerified) {
         setErr("Please verify your email before logging in.");
         setLoading(false);
         return;
       }
+
+      // Check or create user document in Firestore
+      const userRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(userRef);
+
+      if (!docSnap.exists()) {
+        const role = user.email === "mis@brightbots.in" ? "super_admin" : "user";
+        await setDoc(userRef, {
+          email: user.email,
+          emailVerified: user.emailVerified,
+          role,
+        });
+      }
+
       navigate("/dashboard");
     } catch (err) {
       setErr("Login failed: " + err.message);
