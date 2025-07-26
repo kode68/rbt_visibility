@@ -8,7 +8,7 @@ const RBTCard = ({ site, rbt }) => {
     const [breakdownStatus, setBreakdownStatus] = useState(rbt?.breakdown_status || "N/A");
     const [runningStatus, setRunningStatus] = useState(rbt?.running_status || "Auto");
     const [work, setWork] = useState(rbt?.work || "");
-    const [partIssues, setPartIssues] = useState(rbt?.part_issues || {});
+    const [partIssues, setPartIssues] = useState({});
     const [editableFields, setEditableFields] = useState({
         cleaner_did: rbt?.cleaner_did || "",
         tc_did: rbt?.tc_did || "",
@@ -22,6 +22,13 @@ const RBTCard = ({ site, rbt }) => {
     const isSuperAdmin = userEmail === "mis@brightbots.in";
 
     const rbtRef = doc(db, "sites", site, "rbts", rbt.rbt_id);
+
+    // Load part_issues from Firestore on mount/update
+    useEffect(() => {
+        if (rbt?.part_issues) {
+            setPartIssues(rbt.part_issues);
+        }
+    }, [rbt]);
 
     const hasActiveParts = Object.values(partIssues || {}).some(
         (p) => p?.dispatch_date || p?.delivery_date
@@ -130,7 +137,6 @@ const RBTCard = ({ site, rbt }) => {
                         <option value="Auto">Auto</option>
                         <option value="Manual">Manual</option>
                         <option value="Not Running">Not Running</option>
-                        <option value="Breakdown">Breakdown</option>
                     </select>
                 </div>
 
@@ -142,10 +148,9 @@ const RBTCard = ({ site, rbt }) => {
                         className="input w-full"
                     >
                         <option value="">Select Breakdown Status</option>
-                        <option value="Running">Running</option>
                         <option value="Running With Issue">Running With Issue</option>
                         <option value="Breakdown">Breakdown</option>
-                        <option value="Not Running">Not Running</option>
+                        <option value="N/A">Not Applicable</option>
                     </select>
                 </div>
 
