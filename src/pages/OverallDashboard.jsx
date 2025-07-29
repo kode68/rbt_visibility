@@ -195,7 +195,7 @@ const OverallDashboard = () => {
             const updateData = { [field]: String(value), last_updated: serverTimestamp() };
 
             if (field === "running_status") {
-                updateData.running_status_ageing = value === "Auto" ? 0 : 0;
+                updateData.running_status_ageing = value === "Auto" ? 0 : 0; // set to 0, will update after save
             }
 
             await updateDoc(ref, updateData);
