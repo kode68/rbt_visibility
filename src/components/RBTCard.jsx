@@ -4,11 +4,11 @@ import { db, auth } from "../firebase";
 import { logAndUpdateField } from "../utils/db";
 import PartIssueSection from "./PartIssueSection";
 
-const RBTCard = ({ site, rbt }) => {
+const RBTCard = ({ site, rbt, filters }) => {
     const [breakdownStatus, setBreakdownStatus] = useState(rbt?.breakdown_status || "N/A");
     const [runningStatus, setRunningStatus] = useState(rbt?.running_status || "Auto");
     const [work, setWork] = useState(rbt?.work || "");
-    const [partIssues, setPartIssues] = useState({});
+    const [partIssues, setPartIssues] = useState(rbt?.part_issues || {});
     const [editableFields, setEditableFields] = useState({
         cleaner_did: rbt?.cleaner_did || "",
         tc_did: rbt?.tc_did || "",
@@ -17,23 +17,29 @@ const RBTCard = ({ site, rbt }) => {
     });
 
     const [showParts, setShowParts] = useState(false);
+
     const userEmail = auth.currentUser?.email;
     const isAdmin = userEmail?.endsWith("@brightbots.in");
     const isSuperAdmin = userEmail === "mis@brightbots.in";
 
     const rbtRef = doc(db, "sites", site, "rbts", rbt.rbt_id);
 
-    // Load part_issues from Firestore on mount/update
+    // Sync part issues with RBT updates
     useEffect(() => {
         if (rbt?.part_issues) {
             setPartIssues(rbt.part_issues);
         }
     }, [rbt]);
 
+    // Check if any part is active or has valid in-transit details
     const hasActiveParts = Object.values(partIssues || {}).some(
         (p) => p?.dispatch_date || p?.delivery_date
     );
+    const hasValidInTransitParts = Object.values(partIssues || {}).some(
+        (p) => p?.dispatch_date && p?.delivery_date
+    );
 
+    // Show PartIssueSection conditionally
     useEffect(() => {
         const show =
             ["Breakdown", "Running With Issue", "Not Running"].includes(breakdownStatus) ||
@@ -49,12 +55,12 @@ const RBTCard = ({ site, rbt }) => {
         const oldValue = {
             running_status: runningStatus,
             breakdown_status: breakdownStatus,
-            work: work
+            work: work,
         }[field];
 
         await updateDoc(rbtRef, {
             [field]: newValue,
-            last_updated: serverTimestamp()
+            last_updated: serverTimestamp(),
         });
 
         await logAndUpdateField(site, rbt.rbt_id, field, oldValue, newValue);
@@ -71,7 +77,7 @@ const RBTCard = ({ site, rbt }) => {
 
         await updateDoc(rbtRef, {
             [field]: value,
-            last_updated: serverTimestamp()
+            last_updated: serverTimestamp(),
         });
 
         await logAndUpdateField(site, rbt.rbt_id, field, oldValue, value);
@@ -81,10 +87,28 @@ const RBTCard = ({ site, rbt }) => {
         if (!window.confirm("Are you sure you want to delete this RBT? This action is irreversible.")) return;
         await deleteDoc(rbtRef);
         alert(`${rbt.rbt_id} deleted successfully.`);
-        window.location.reload(); // force refresh
+        window.location.reload();
     };
 
-    if (!rbt || !rbt.rbt_id) return null;
+    // ✅ FILTER LOGIC
+    const matchesFilters = () => {
+        if (!filters) return true;
+        if (filters.site && site !== filters.site) return false;
+        if (filters.runningStatus && runningStatus !== filters.runningStatus) return false;
+        if (filters.breakdownStatus && breakdownStatus !== filters.breakdownStatus) return false;
+        if (filters.work && work !== filters.work) return false;
+        if (filters.date) {
+            const rbtDate = rbt.last_updated?.toDate
+                ? rbt.last_updated.toDate()
+                : rbt.last_updated
+                    ? new Date(rbt.last_updated)
+                    : null;
+            if (!rbtDate || rbtDate.toDateString() !== filters.date.toDateString()) return false;
+        }
+        return true;
+    };
+
+    if (!rbt || !rbt.rbt_id || !matchesFilters()) return null;
 
     return (
         <div
@@ -105,6 +129,7 @@ const RBTCard = ({ site, rbt }) => {
                 )}
             </div>
 
+            {/* Editable Fields */}
             <div className="grid grid-cols-2 gap-3 text-sm mb-4 text-gray-700">
                 {["cleaner_did", "tc_did", "cl_pcb_model", "tc_pcb_model"].map((field) => (
                     <div key={field}>
@@ -125,6 +150,7 @@ const RBTCard = ({ site, rbt }) => {
                 ))}
             </div>
 
+            {/* Dropdowns */}
             <div className="space-y-3 text-sm">
                 <div>
                     <label className="block font-medium mb-1">Running Status</label>
@@ -162,14 +188,24 @@ const RBTCard = ({ site, rbt }) => {
                         className="input w-full"
                     >
                         <option value="">Select Work Status</option>
+                        <option value="Part Procurement">Part Procurement</option>
+                        <option value="Part In-Transit" disabled={!hasValidInTransitParts}>
+                            🔒 Part In-Transit
+                        </option>
                         <option value="Part Installation">Part Installation</option>
                         <option value="Part Testing">Part Testing</option>
                         <option value="Trial">Trial</option>
                         <option value="Auto Scheduling">Auto Scheduling</option>
                     </select>
+                    {!hasValidInTransitParts && work === "Part In-Transit" && (
+                        <p className="text-xs text-red-500 mt-1">
+                            🔒 To unlock, enter both dispatch and delivery date for at least one part.
+                        </p>
+                    )}
                 </div>
             </div>
 
+            {/* Part Issues Section */}
             {showParts && (
                 <div className="mt-5">
                     <PartIssueSection

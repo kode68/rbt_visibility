@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Logs from "./pages/Logs";
 import { auth } from "./firebase";
 import ManageUsers from "./pages/ManageUsers";
+import OverallDashboard from "./pages/OverallDashboard";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/logs" element={<AdminOnly><Logs /></AdminOnly>} />
         <Route path="/manage-users" element={<ManageUsers />} />
+        <Route path="/overall-dashboard" element={<OverallDashboard />} />
       </Routes>
       <Toaster position="top-center" />
     </Router>

@@ -16,7 +16,7 @@ function Logs() {
     const [endDate, setEndDate] = useState("");
 
     const navigate = useNavigate();
-    const isSuperAdmin = currentUser?.email === "mis@brightbots.in";
+    const isSuperAdmin = currentUser?.email === "dev@brightbots.in";
 
     useEffect(() => {
         const unsub = auth.onAuthStateChanged((user) => {

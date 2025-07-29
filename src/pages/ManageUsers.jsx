@@ -28,7 +28,7 @@ export default function ManageUsers() {
     };
 
     const makeAdmin = async (userId, email) => {
-        if (email === "mis@brightbots.in") return; // extra safeguard
+        if (email === "dev@brightbots.in") return; // extra safeguard
         const userRef = doc(db, "users", userId);
         await updateDoc(userRef, { role: "admin" });
         fetchUsers();

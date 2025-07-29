@@ -186,6 +186,12 @@ export default function Dashboard() {
           {firstName && (
             <div className="text-gray-700 font-semibold mr-2">Hi, {firstName}</div>
           )}
+          <button
+            onClick={() => navigate("/overall-dashboard")}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg shadow-lg"
+          >
+            📊 View Overall Dashboard
+          </button>
           {(isAdmin || isSuperAdmin) && (
             <button
               onClick={() => navigate("/logs")}
