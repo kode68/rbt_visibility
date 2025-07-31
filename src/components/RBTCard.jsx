@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { doc, deleteDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { logAndUpdateField } from "../utils/db";
 import PartIssueSection from "./PartIssueSection";
 
-const RBTCard = ({ site, rbt, filters }) => {
+const RBTCard = ({ client, site, rbt, filters }) => {
     const [breakdownStatus, setBreakdownStatus] = useState(rbt?.breakdown_status || "N/A");
     const [runningStatus, setRunningStatus] = useState(rbt?.running_status || "Auto");
     const [work, setWork] = useState(rbt?.work || "");
@@ -18,79 +18,96 @@ const RBTCard = ({ site, rbt, filters }) => {
 
     const [showParts, setShowParts] = useState(false);
 
-    const userEmail = auth.currentUser?.email;
-    const isAdmin = userEmail?.endsWith("@brightbots.in");
+    const userEmail = auth.currentUser?.email || "";
+    const isAdmin = userEmail.endsWith("@brightbots.in");
     const isSuperAdmin = userEmail === "dev@brightbots.in";
 
-    const rbtRef = doc(db, "sites", site, "rbts", rbt.rbt_id);
+    console.log("🛠 Client:", client || "N/A", "| Site:", site, "| RBT:", rbt?.rbt_id);
 
-    // Sync part issues with RBT updates
+    const rbtRef =
+        client && site && rbt?.rbt_id
+            ? doc(db, "clients", client, "sites", site, "rbts", rbt.rbt_id)
+            : null;
+
     useEffect(() => {
-        if (rbt?.part_issues) {
-            setPartIssues(rbt.part_issues);
-        }
+        if (rbt?.part_issues) setPartIssues(rbt.part_issues);
     }, [rbt]);
 
-    // Check if any part is active or has valid in-transit details
     const hasActiveParts = Object.values(partIssues || {}).some(
         (p) => p?.dispatch_date || p?.delivery_date
     );
+
     const hasValidInTransitParts = Object.values(partIssues || {}).some(
         (p) => p?.dispatch_date && p?.delivery_date
     );
 
-    // Show PartIssueSection conditionally
     useEffect(() => {
-        const show =
+        setShowParts(
             ["Breakdown", "Running With Issue", "Not Running"].includes(breakdownStatus) ||
-            ["Manual", "Breakdown"].includes(runningStatus);
-        setShowParts(show);
+            ["Manual", "Breakdown"].includes(runningStatus)
+        );
     }, [breakdownStatus, runningStatus]);
 
     const handlePartIssueChange = useCallback((updated) => {
         setPartIssues(updated);
     }, []);
 
+    const validateClientPath = () => {
+        if (!client || !site || !rbt?.rbt_id) {
+            console.warn("⚠️ Missing client/site/RBT ID. Update skipped.");
+            alert("Update failed: Missing client or site reference.");
+            return false;
+        }
+        return true;
+    };
+
     const handleUpdate = async (field, newValue) => {
-        const oldValue = {
-            running_status: runningStatus,
-            breakdown_status: breakdownStatus,
-            work: work,
-        }[field];
+        if (!validateClientPath()) return;
+        try {
+            const oldValue = { running_status: runningStatus, breakdown_status: breakdownStatus, work }[field];
+            if (oldValue === newValue) return;
 
-        await updateDoc(rbtRef, {
-            [field]: newValue,
-            last_updated: serverTimestamp(),
-        });
+            console.log(`🔄 Updating ${field} for ${rbt.rbt_id}:`, { oldValue, newValue });
+            await logAndUpdateField(client, site, rbt.rbt_id, field, oldValue, newValue);
 
-        await logAndUpdateField(site, rbt.rbt_id, field, oldValue, newValue);
-
-        if (field === "running_status") setRunningStatus(newValue);
-        if (field === "breakdown_status") setBreakdownStatus(newValue);
-        if (field === "work") setWork(newValue);
+            if (field === "running_status") setRunningStatus(newValue);
+            if (field === "breakdown_status") setBreakdownStatus(newValue);
+            if (field === "work") setWork(newValue);
+        } catch (err) {
+            console.error(`❌ Update failed for ${field} on ${rbt?.rbt_id}:`, err);
+            alert("Update failed. Check console for details.");
+        }
     };
 
     const handleFieldEdit = async (field, value) => {
-        const oldValue = editableFields[field];
-        const updatedFields = { ...editableFields, [field]: value };
-        setEditableFields(updatedFields);
+        if (!validateClientPath()) return;
+        if (editableFields[field] === value) return;
+        try {
+            const oldValue = editableFields[field];
+            setEditableFields((prev) => ({ ...prev, [field]: value }));
 
-        await updateDoc(rbtRef, {
-            [field]: value,
-            last_updated: serverTimestamp(),
-        });
-
-        await logAndUpdateField(site, rbt.rbt_id, field, oldValue, value);
+            console.log(`✏️ Editing ${field} for ${rbt.rbt_id}:`, { oldValue, value });
+            await logAndUpdateField(client, site, rbt.rbt_id, field, oldValue, value);
+        } catch (err) {
+            console.error(`❌ Field update failed for ${field}:`, err);
+            alert("Field update failed. Check console for details.");
+        }
     };
 
     const deleteRBT = async () => {
+        if (!validateClientPath()) return;
+        if (!rbtRef) return;
         if (!window.confirm("Are you sure you want to delete this RBT? This action is irreversible.")) return;
-        await deleteDoc(rbtRef);
-        alert(`${rbt.rbt_id} deleted successfully.`);
-        window.location.reload();
+        try {
+            await deleteDoc(rbtRef);
+            alert(`${rbt.rbt_id} deleted successfully.`);
+            window.location.reload();
+        } catch (err) {
+            console.error("❌ RBT deletion failed:", err);
+            alert("Failed to delete RBT.");
+        }
     };
 
-    // ✅ FILTER LOGIC
     const matchesFilters = () => {
         if (!filters) return true;
         if (filters.site && site !== filters.site) return false;
@@ -111,10 +128,7 @@ const RBTCard = ({ site, rbt, filters }) => {
     if (!rbt || !rbt.rbt_id || !matchesFilters()) return null;
 
     return (
-        <div
-            className={`p-4 rounded-xl shadow-md transition-all w-full ${hasActiveParts ? "bg-red-100 border border-red-400" : "bg-white"
-                } hover:shadow-lg`}
-        >
+        <div className={`p-4 rounded-xl shadow-md transition-all w-full ${hasActiveParts ? "bg-red-100 border border-red-400" : "bg-white"} hover:shadow-lg`}>
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-extrabold text-blue-800 mb-3 tracking-tight">
                     🦿 {rbt.rbt_id.replace(/RBT/, "RBT ")}
@@ -133,15 +147,13 @@ const RBTCard = ({ site, rbt, filters }) => {
             <div className="grid grid-cols-2 gap-3 text-sm mb-4 text-gray-700">
                 {["cleaner_did", "tc_did", "cl_pcb_model", "tc_pcb_model"].map((field) => (
                     <div key={field}>
-                        <label className="font-semibold block capitalize">
-                            {field.replace(/_/g, " ").toUpperCase()}:
-                        </label>
+                        <label className="font-semibold block capitalize">{field.replace(/_/g, " ").toUpperCase()}:</label>
                         {isAdmin ? (
                             <input
                                 type="text"
                                 value={editableFields[field]}
                                 onChange={(e) => handleFieldEdit(field, e.target.value)}
-                                className="input w-full mt-1"
+                                className="input w-full mt-1 border px-2 py-1 rounded-md"
                             />
                         ) : (
                             <p>{editableFields[field]}</p>
@@ -157,7 +169,7 @@ const RBTCard = ({ site, rbt, filters }) => {
                     <select
                         value={runningStatus}
                         onChange={(e) => handleUpdate("running_status", e.target.value)}
-                        className="input w-full"
+                        className="input w-full border px-2 py-1 rounded-md"
                     >
                         <option value="">Select Running Status</option>
                         <option value="Auto">Auto</option>
@@ -171,7 +183,7 @@ const RBTCard = ({ site, rbt, filters }) => {
                     <select
                         value={breakdownStatus}
                         onChange={(e) => handleUpdate("breakdown_status", e.target.value)}
-                        className="input w-full"
+                        className="input w-full border px-2 py-1 rounded-md"
                     >
                         <option value="">Select Breakdown Status</option>
                         <option value="Running With Issue">Running With Issue</option>
@@ -185,13 +197,11 @@ const RBTCard = ({ site, rbt, filters }) => {
                     <select
                         value={work}
                         onChange={(e) => handleUpdate("work", e.target.value)}
-                        className="input w-full"
+                        className="input w-full border px-2 py-1 rounded-md"
                     >
                         <option value="">Select Work Status</option>
                         <option value="Part Procurement">Part Procurement</option>
-                        <option value="Part In-Transit" disabled={!hasValidInTransitParts}>
-                            🔒 Part In-Transit
-                        </option>
+                        <option value="Part In-Transit" disabled={!hasValidInTransitParts}>🔒 Part In-Transit</option>
                         <option value="Part Installation">Part Installation</option>
                         <option value="Part Testing">Part Testing</option>
                         <option value="Trial">Trial</option>
@@ -209,6 +219,7 @@ const RBTCard = ({ site, rbt, filters }) => {
             {showParts && (
                 <div className="mt-5">
                     <PartIssueSection
+                        client={client}
                         site={site}
                         rbtId={rbt.rbt_id}
                         rbt={rbt}

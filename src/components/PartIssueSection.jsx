@@ -10,53 +10,59 @@ const ALL_PARTS = [
     "SS PIPE", "SSC", "STEPPER DRIVE", "STEPPER MOTOR", "TC BELT", "TC Load Wheel", "XBEE"
 ];
 
-const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
+const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange }) => {
     const [selectedParts, setSelectedParts] = useState({});
 
+    // ✅ Always call hooks first
     useEffect(() => {
-        if (rbt?.part_issues) {
+        if (rbt?.part_issues && typeof rbt.part_issues === "object") {
             const initial = {};
-            for (const [part, data] of Object.entries(rbt.part_issues)) {
-                if (data?.dispatch_date || data?.delivery_date) {
+            Object.entries(rbt.part_issues).forEach(([part, data]) => {
+                if (data && (data.dispatch_date || data.delivery_date)) {
                     initial[part] = {
                         dispatch_date: data.dispatch_date || "",
                         delivery_date: data.delivery_date || ""
                     };
                 }
-            }
+            });
             setSelectedParts(initial);
-            onPartIssueChange(initial);
+            if (typeof onPartIssueChange === "function") onPartIssueChange(initial);
+        } else {
+            setSelectedParts({});
         }
-    }, [rbt, onPartIssueChange]); // ✅ Fixed dependency warning
+    }, [rbt, onPartIssueChange]);
 
-    const rbtRef = doc(db, "sites", site, "rbts", rbtId);
+    // ✅ Early return after hooks
+    if (!client || !site || !rbtId || !rbt) {
+        return <p className="text-red-500 text-sm">Loading part issues...</p>;
+    }
+
+    const rbtRef = doc(db, "clients", client, "sites", site, "rbts", rbtId);
 
     const togglePart = async (part) => {
         const updated = { ...selectedParts };
-        if (selectedParts[part]) {
+        const previous = selectedParts[part] || null;
+
+        if (previous) {
+            // Remove part
             delete updated[part];
             await updateDoc(rbtRef, {
-                [`part_issues.${part}`]: {
-                    dispatch_date: "",
-                    delivery_date: ""
-                },
+                [`part_issues.${part}`]: { dispatch_date: "", delivery_date: "" },
                 last_updated: serverTimestamp()
             });
-            await logAndUpdateField(site, rbtId, `part_issues.${part}`, selectedParts[part], null);
+            await logAndUpdateField(client, site, rbtId, `part_issues.${part}`, previous, null);
         } else {
+            // Add part
             updated[part] = { dispatch_date: "", delivery_date: "" };
             await updateDoc(rbtRef, {
-                [`part_issues.${part}`]: {
-                    dispatch_date: "",
-                    delivery_date: ""
-                },
+                [`part_issues.${part}`]: updated[part],
                 last_updated: serverTimestamp()
             });
-            await logAndUpdateField(site, rbtId, `part_issues.${part}`, null, updated[part]);
+            await logAndUpdateField(client, site, rbtId, `part_issues.${part}`, null, updated[part]);
         }
 
         setSelectedParts(updated);
-        onPartIssueChange(updated);
+        if (typeof onPartIssueChange === "function") onPartIssueChange(updated);
     };
 
     const updateDate = async (part, field, value) => {
@@ -68,15 +74,16 @@ const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
                 [field]: value
             }
         };
+
         setSelectedParts(updated);
-        onPartIssueChange(updated);
+        if (typeof onPartIssueChange === "function") onPartIssueChange(updated);
 
         await updateDoc(rbtRef, {
             [`part_issues.${part}.${field}`]: value,
             last_updated: serverTimestamp()
         });
 
-        await logAndUpdateField(site, rbtId, `part_issues.${part}.${field}`, prev, value);
+        await logAndUpdateField(client, site, rbtId, `part_issues.${part}.${field}`, prev, value);
     };
 
     return (
@@ -97,8 +104,8 @@ const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
                 ))}
             </div>
 
-            {Object.entries(selectedParts).map(([part, dates]) => (
-                dates && (
+            {Object.entries(selectedParts || {}).map(([part, dates]) =>
+                dates ? (
                     <div key={part} className="mb-4">
                         <p className="font-semibold text-sm text-blue-700 mb-2">{part}</p>
                         <div className="flex gap-4 items-start">
@@ -106,7 +113,7 @@ const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
                                 <label className="text-xs text-gray-500 mb-1">Dispatch Date</label>
                                 <input
                                     type="date"
-                                    value={dates.dispatch_date}
+                                    value={dates.dispatch_date || ""}
                                     onChange={(e) => updateDate(part, "dispatch_date", e.target.value)}
                                     className="w-full rounded-md border border-gray-300 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -115,15 +122,15 @@ const PartIssueSection = ({ site, rbtId, rbt, onPartIssueChange }) => {
                                 <label className="text-xs text-gray-500 mb-1">Delivery Date</label>
                                 <input
                                     type="date"
-                                    value={dates.delivery_date}
+                                    value={dates.delivery_date || ""}
                                     onChange={(e) => updateDate(part, "delivery_date", e.target.value)}
                                     className="w-full rounded-md border border-gray-300 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
                         </div>
                     </div>
-                )
-            ))}
+                ) : null
+            )}
         </div>
     );
 };

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
-import { collectionGroup, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { format, differenceInDays } from "date-fns";
 import Chart from "chart.js/auto";
 
 const OverallDashboard = () => {
+    const [clients, setClients] = useState([]);
+    const [selectedClient, setSelectedClient] = useState("");
     const [rbts, setRbts] = useState([]);
     const [filtered, setFiltered] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -41,6 +43,7 @@ const OverallDashboard = () => {
         { value: "N/A", label: "N/A" }
     ];
 
+    // ✅ Fetch user role
     useEffect(() => {
         const fetchRole = () => {
             const user = auth.currentUser;
@@ -52,39 +55,60 @@ const OverallDashboard = () => {
         fetchRole();
     }, []);
 
-    // ✅ Fetch all RBTs
+    // ✅ Fetch all clients
     useEffect(() => {
+        const fetchClients = async () => {
+            try {
+                const snapshot = await getDocs(collection(db, "clients"));
+                setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (err) {
+                console.error("Error fetching clients:", err);
+            }
+        };
+        fetchClients();
+    }, []);
+
+    // ✅ Fetch all RBTs for selected client
+    useEffect(() => {
+        if (!selectedClient) return;
+
         let interval;
         const fetchAllRBTs = async () => {
             try {
                 setLoading(true);
-                const snapshot = await getDocs(collectionGroup(db, "rbts"));
+                const sitesSnapshot = await getDocs(collection(db, "clients", selectedClient, "sites"));
+                let allRbts = [];
 
-                const data = snapshot.docs.map((docItem) => {
-                    const rbt = docItem.data() || {};
-                    const lastUpdated = rbt?.last_updated?.toDate?.() || null;
-                    const sitePath = docItem.ref?.path?.split("/") || [];
+                for (const siteDoc of sitesSnapshot.docs) {
+                    const siteName = siteDoc.id;
+                    const rbtsSnapshot = await getDocs(collection(db, "clients", selectedClient, "sites", siteName, "rbts"));
 
-                    return {
-                        id: docItem.id,
-                        rbt_id: docItem.id,
-                        ...rbt,
-                        site: sitePath[1] || "Unknown",
-                        running_status: typeof rbt.running_status === "string" ? rbt.running_status : "N/A",
-                        breakdown_status: typeof rbt.breakdown_status === "string" ? rbt.breakdown_status : "N/A",
-                        work: typeof rbt.work === "string" ? rbt.work : "N/A",
-                        last_updated: lastUpdated,
-                        running_status_ageing:
-                            rbt.running_status === "Auto"
-                                ? 0
-                                : lastUpdated
-                                    ? Math.max(differenceInDays(new Date(), lastUpdated), 0)
-                                    : "-",
-                    };
-                });
+                    const siteRbts = rbtsSnapshot.docs.map(docItem => {
+                        const rbt = docItem.data() || {};
+                        const lastUpdated = rbt?.last_updated?.toDate?.() || null;
+                        return {
+                            id: docItem.id,
+                            rbt_id: docItem.id,
+                            site: siteName,
+                            ...rbt,
+                            running_status: rbt.running_status || "N/A",
+                            breakdown_status: rbt.breakdown_status || "N/A",
+                            work: rbt.work || "N/A",
+                            last_updated: lastUpdated,
+                            running_status_ageing:
+                                rbt.running_status === "Auto"
+                                    ? 0
+                                    : lastUpdated
+                                        ? Math.max(differenceInDays(new Date(), lastUpdated), 0)
+                                        : "-"
+                        };
+                    });
 
-                setRbts(data);
-                setFiltered(data);
+                    allRbts = [...allRbts, ...siteRbts];
+                }
+
+                setRbts(allRbts);
+                setFiltered(allRbts);
             } catch (error) {
                 console.error("Error fetching RBTs:", error);
             } finally {
@@ -96,7 +120,7 @@ const OverallDashboard = () => {
         interval = setInterval(fetchAllRBTs, 30000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [selectedClient]);
 
     // ✅ Apply filters
     useEffect(() => {
@@ -160,7 +184,6 @@ const OverallDashboard = () => {
 
     const handleFilterChange = (e) => setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-    // ✅ Export CSV
     const handleExportCSV = () => {
         const headers = ["Site", "RBT", "Running Status", "Breakdown Status", "Work", "Ageing", "Last Updated"];
         const rows = filtered.map((rbt) => [
@@ -186,16 +209,15 @@ const OverallDashboard = () => {
         document.body.removeChild(link);
     };
 
-    // ✅ Update RBT fields (always store as string)
     const handleEditField = async (rbtId, site, field, value) => {
         try {
-            const ref = doc(db, "sites", site, "rbts", rbtId);
+            const ref = doc(db, "clients", selectedClient, "sites", site, "rbts", rbtId);
             const now = new Date();
 
             const updateData = { [field]: String(value), last_updated: serverTimestamp() };
 
             if (field === "running_status") {
-                updateData.running_status_ageing = value === "Auto" ? 0 : 0; // set to 0, will update after save
+                updateData.running_status_ageing = value === "Auto" ? 0 : 0;
             }
 
             await updateDoc(ref, updateData);
@@ -207,12 +229,7 @@ const OverallDashboard = () => {
                             ...r,
                             ...updateData,
                             last_updated: now,
-                            running_status_ageing:
-                                field === "running_status"
-                                    ? value === "Auto"
-                                        ? 0
-                                        : 0
-                                    : r.running_status_ageing,
+                            running_status_ageing: field === "running_status" ? (value === "Auto" ? 0 : 0) : r.running_status_ageing,
                         }
                         : r
                 )
@@ -230,6 +247,16 @@ const OverallDashboard = () => {
     return (
         <div className="p-6">
             <h1 className="text-2xl font-bold mb-6">📊 Overall RBT Dashboard</h1>
+
+            {/* CLIENT SELECTOR */}
+            <div className="mb-4">
+                <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="border p-2 rounded-md">
+                    <option value="">Select Client</option>
+                    {clients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.id}</option>
+                    ))}
+                </select>
+            </div>
 
             {/* SUMMARY */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -325,7 +352,7 @@ const OverallDashboard = () => {
                                         <td key={field} className="py-2 px-4">
                                             {userRole === "admin" || userRole === "super_admin" ? (
                                                 <select
-                                                    value={typeof rbt[field] === "object" ? rbt[field]?.value || "N/A" : rbt[field] || "N/A"}
+                                                    value={rbt[field] || "N/A"}
                                                     onChange={(e) => handleEditField(rbt.id, rbt.site, field, e.target.value)}
                                                     className="border p-1 rounded"
                                                 >
@@ -337,9 +364,7 @@ const OverallDashboard = () => {
                                                         workOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                                 </select>
                                             ) : (
-                                                typeof rbt[field] === "object"
-                                                    ? rbt[field]?.value || "N/A"
-                                                    : String(rbt[field] || "N/A")
+                                                rbt[field] || "N/A"
                                             )}
                                         </td>
                                     ))}

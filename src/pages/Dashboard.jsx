@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
-import SiteSelector from "../components/SiteSelector";
 import RBTCard from "../components/RBTCard";
 import { auth, db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import {
   collection,
-  getDocs,
   doc,
   setDoc,
   deleteDoc,
   getDoc,
   updateDoc,
+  serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 
@@ -43,6 +43,9 @@ const defaultPartIssues = {
 };
 
 export default function Dashboard() {
+  const [clients, setClients] = useState([]);
+  const [sites, setSites] = useState([]);
+  const [selectedClient, setSelectedClient] = useState("");
   const [selectedSite, setSelectedSite] = useState("");
   const [rbtList, setRbtList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -50,6 +53,7 @@ export default function Dashboard() {
   const [firstName, setFirstName] = useState("");
   const navigate = useNavigate();
 
+  // ✅ Auth & User Role Handling
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
       if (!user) {
@@ -67,9 +71,7 @@ export default function Dashboard() {
           setFirstName(data.firstName || "");
 
           if (data.emailVerified !== refreshedUser.emailVerified) {
-            await updateDoc(userRef, {
-              emailVerified: refreshedUser.emailVerified,
-            });
+            await updateDoc(userRef, { emailVerified: refreshedUser.emailVerified });
           }
 
           if (!refreshedUser.emailVerified) {
@@ -81,42 +83,68 @@ export default function Dashboard() {
     return unsub;
   }, [navigate]);
 
+  // ✅ Real-time fetch clients
   useEffect(() => {
-    const fetchRBTs = async () => {
-      if (!selectedSite) return;
-      setLoading(true);
-      try {
-        const rbtsRef = collection(db, "sites", selectedSite, "rbts");
-        const snapshot = await getDocs(rbtsRef);
-        const robots = snapshot.docs.map((doc) => ({
-          rbt_id: doc.id,
-          ...doc.data(),
-        }));
+    const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => {
+      if (!snapshot.empty) {
+        setClients(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      } else {
+        setClients([]);
+      }
+    });
+    return () => unsubClients();
+  }, []);
 
-        robots.sort((a, b) => {
-          const numA = parseInt(a.rbt_id.replace("RBT", ""));
-          const numB = parseInt(b.rbt_id.replace("RBT", ""));
-          return numA - numB;
-        });
+  // ✅ Handle Client Change → fetch sites in real-time
+  const handleClientChange = (clientId) => {
+    setSelectedClient(clientId);
+    setSelectedSite("");
+    setSites([]);
+    setRbtList([]);
 
-        setRbtList(robots);
-      } catch (error) {
-        console.error("Error fetching RBTs:", error);
+    if (!clientId) return;
+
+    const sitesRef = collection(db, `clients/${clientId}/sites`);
+    const unsubSites = onSnapshot(sitesRef, (sitesSnapshot) => {
+      if (!sitesSnapshot.empty) {
+        setSites(sitesSnapshot.docs.map((doc) => doc.id));
+      } else {
+        setSites([]);
+      }
+    });
+
+    return () => unsubSites();
+  };
+
+  // ✅ Real-time fetch RBTs
+  useEffect(() => {
+    if (!selectedClient || !selectedSite) return;
+
+    setLoading(true);
+    const rbtsRef = collection(db, `clients/${selectedClient}/sites/${selectedSite}/rbts`);
+    const unsubRbts = onSnapshot(rbtsRef, (snapshot) => {
+      if (!snapshot.empty) {
+        setRbtList(snapshot.docs.map((doc) => ({ rbt_id: doc.id, ...doc.data() })));
+      } else {
+        setRbtList([]);
       }
       setLoading(false);
-    };
+    });
 
-    fetchRBTs();
-  }, [selectedSite]);
+    return () => unsubRbts();
+  }, [selectedClient, selectedSite]);
 
-  const isAdmin = currentUser?.email.endsWith("@brightbots.in");
+  // ✅ Role Checks
+  const isAdmin = currentUser?.email?.endsWith("@brightbots.in");
   const isSuperAdmin = currentUser?.email === "dev@brightbots.in";
 
+  // ✅ Add RBT
   const handleAddRBT = async () => {
+    if (!selectedClient || !selectedSite) return toast.error("Select client & site first!");
     try {
       const nextId = rbtList.length + 1;
       const newRbtId = `RBT${nextId}`;
-      const rbtRef = doc(db, "sites", selectedSite, "rbts", newRbtId);
+      const rbtRef = doc(db, `clients/${selectedClient}/sites/${selectedSite}/rbts`, newRbtId);
 
       await setDoc(rbtRef, {
         breakdown_status: "N/A",
@@ -127,35 +155,23 @@ export default function Dashboard() {
         cl_pcb_model: "",
         tc_pcb_model: "",
         part_issues: defaultPartIssues,
-        last_updated: new Date(),
+        running_status_ageing: 0,
+        last_updated: serverTimestamp(),
       });
 
       toast.success(`RBT ${newRbtId} added`);
-      setRbtList((prev) => [
-        ...prev,
-        {
-          rbt_id: newRbtId,
-          cleaner_did: "",
-          tc_did: "",
-          cl_pcb_model: "",
-          tc_pcb_model: "",
-          running_status: "Auto",
-          breakdown_status: "N/A",
-          work: "",
-          part_issues: defaultPartIssues,
-        },
-      ]);
     } catch (err) {
       console.error(err);
       toast.error("Failed to add RBT");
     }
   };
 
+  // ✅ Delete RBT
   const handleDeleteRBT = async (rbt_id) => {
+    if (!isSuperAdmin) return toast.error("Only Super Admin can delete RBTs");
     if (!window.confirm(`Delete ${rbt_id}? This cannot be undone.`)) return;
     try {
-      await deleteDoc(doc(db, "sites", selectedSite, "rbts", rbt_id));
-      setRbtList((prev) => prev.filter((r) => r.rbt_id !== rbt_id));
+      await deleteDoc(doc(db, `clients/${selectedClient}/sites/${selectedSite}/rbts`, rbt_id));
       toast.success(`Deleted ${rbt_id}`);
     } catch (err) {
       console.error(err);
@@ -165,27 +181,19 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 px-6 py-8 font-sans">
+      {/* Header */}
       <div className="flex items-center justify-between mb-10 border-b pb-4">
         <div className="flex items-center gap-4">
           <img
             src="https://brightbots.in/img/Brightbots-logo.png"
             className="h-12 drop-shadow-sm cursor-pointer"
             alt="BrightBots Logo"
-            onClick={() => {
-              const user = auth.currentUser;
-              if (user && user.emailVerified) {
-                navigate("/dashboard");
-              } else {
-                navigate("/");
-              }
-            }}
+            onClick={() => navigate("/dashboard")}
           />
           <h1 className="text-3xl font-extrabold text-blue-800 tracking-tight">RBT Dashboard</h1>
         </div>
         <div className="flex gap-3 items-center">
-          {firstName && (
-            <div className="text-gray-700 font-semibold mr-2">Hi, {firstName}</div>
-          )}
+          {firstName && <div className="text-gray-700 font-semibold mr-2">Hi, {firstName}</div>}
           <button
             onClick={() => navigate("/overall-dashboard")}
             className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg shadow-lg"
@@ -217,11 +225,45 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mb-8">
-        <SiteSelector onSiteChange={setSelectedSite} />
+      {/* Client & Site Selector */}
+      <div className="mb-8 flex gap-4">
+        <div>
+          <label className="block text-gray-700 mb-1">Select Client:</label>
+          <select
+            value={selectedClient}
+            onChange={(e) => handleClientChange(e.target.value)}
+            className="border p-2 rounded-lg"
+          >
+            <option value="">-- Select Client --</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.id}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedClient && (
+          <div>
+            <label className="block text-gray-700 mb-1">Select Site:</label>
+            <select
+              value={selectedSite}
+              onChange={(e) => setSelectedSite(e.target.value)}
+              className="border p-2 rounded-lg"
+            >
+              <option value="">-- Select Site --</option>
+              {sites.map((site) => (
+                <option key={site} value={site}>
+                  {site}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {selectedSite && (
+      {/* RBT Section */}
+      {selectedClient && selectedSite && (
         <>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800">
@@ -246,6 +288,7 @@ export default function Dashboard() {
               {rbtList.map((rbt) => (
                 <RBTCard
                   key={rbt.rbt_id}
+                  client={selectedClient}
                   site={selectedSite}
                   rbt={rbt}
                   isAdmin={isAdmin}

@@ -1,50 +1,68 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase";
 
-const SiteSelector = ({ onSiteChange }) => {
-    const [sites, setSites] = useState([]);
-    const [selectedSite, setSelectedSite] = useState("");
+const SiteSelector = ({ onSelect }) => {
+    const [regions, setRegions] = useState([]);
+    const [selectedRegion, setSelectedRegion] = useState("");
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchSites = async () => {
+        const fetchRegions = async () => {
             try {
-                const snapshot = await getDocs(collection(db, "sites"));
-                const siteNames = snapshot.docs.map(doc => doc.id);
-                console.log("Fetched site names:", siteNames);
-                setSites(siteNames);
+                const snapshot = await getDocs(collection(db, "clients"));
+                const regionList = snapshot.docs.map((doc) => doc.id.trim());
+
+                // ✅ Use Map to keep unique values (case-insensitive)
+                const uniqueRegionsMap = new Map();
+                regionList.forEach((region) => {
+                    const lower = region.toLowerCase();
+                    if (!uniqueRegionsMap.has(lower)) {
+                        uniqueRegionsMap.set(lower, region);
+                    }
+                });
+
+                const uniqueRegions = Array.from(uniqueRegionsMap.values());
+
+                console.log("🔥 Raw Regions:", regionList);
+                console.log("✅ Unique Regions:", uniqueRegions);
+
+                setRegions(uniqueRegions);
             } catch (error) {
-                console.error("Error fetching site names:", error);
+                console.error("Error fetching regions:", error);
+            } finally {
+                setLoading(false);
             }
         };
 
-        fetchSites();
+        fetchRegions();
     }, []);
 
     const handleChange = (e) => {
-        const site = e.target.value;
-        setSelectedSite(site);
-        onSiteChange(site);
+        const value = e.target.value;
+        setSelectedRegion(value);
+        if (onSelect) onSelect(value);
     };
 
     return (
-        <div className="p-4">
-            <label htmlFor="site" className="block mb-2 font-semibold text-lg">
-                Select Site
-            </label>
-            <select
-                id="site"
-                value={selectedSite}
-                onChange={handleChange}
-                className="border border-gray-300 p-2 rounded w-64"
-            >
-                <option value="">-- Choose Site --</option>
-                {sites.map((site) => (
-                    <option key={site} value={site}>
-                        {site}
-                    </option>
-                ))}
-            </select>
+        <div>
+            <label className="block mb-2 font-medium">Select Region</label>
+            {loading ? (
+                <p>Loading regions...</p>
+            ) : (
+                <select
+                    value={selectedRegion}
+                    onChange={handleChange}
+                    className="border p-2 rounded-md"
+                >
+                    <option value="">-- Select Region --</option>
+                    {regions.map((region, index) => (
+                        <option key={index} value={region}>
+                            {region}
+                        </option>
+                    ))}
+                </select>
+            )}
         </div>
     );
 };
