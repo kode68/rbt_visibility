@@ -14,7 +14,7 @@ export default function ManageUsers() {
     const currentUser = auth.currentUser;
 
     useEffect(() => {
-        if (!currentUser || currentUser.email !== "mis@brightbots.in") {
+        if (!currentUser || currentUser.email !== "dev@brightbots.in") {
             navigate("/dashboard");
         } else {
             fetchUsers();
@@ -68,7 +68,7 @@ export default function ManageUsers() {
                             <tr key={user.id} className="border-t hover:bg-gray-50">
                                 <td className="px-4 py-2">{user.email}</td>
                                 <td className="px-4 py-2 font-medium text-gray-800">
-                                    {user.email === "mis@brightbots.in"
+                                    {user.email === "dev@brightbots.in"
                                         ? "Super Admin"
                                         : user.role === "admin"
                                             ? "Admin"
@@ -82,7 +82,7 @@ export default function ManageUsers() {
                                     )}
                                 </td>
                                 <td className="px-4 py-2">
-                                    {user.email !== "mis@brightbots.in" && user.role !== "admin" && (
+                                    {user.email !== "dev@brightbots.in" && user.role !== "admin" && (
                                         <button
                                             onClick={() => makeAdmin(user.id, user.email)}
                                             className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium"

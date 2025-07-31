@@ -30,7 +30,7 @@ function Login() {
       const docSnap = await getDoc(userRef);
 
       if (!docSnap.exists()) {
-        const role = user.email === "mis@brightbots.in" ? "super_admin" : "user";
+        const role = user.email === "dev@brightbots.in" ? "super_admin" : "user";
         await setDoc(userRef, {
           email: user.email,
           emailVerified: user.emailVerified,

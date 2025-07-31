@@ -45,7 +45,7 @@ const OverallDashboard = () => {
         const fetchRole = () => {
             const user = auth.currentUser;
             if (!user || !user.email) return;
-            if (user.email === "mis@brightbots.in") setUserRole("super_admin");
+            if (user.email === "dev@brightbots.in") setUserRole("super_admin");
             else if (user.email.endsWith("@brightbots.in")) setUserRole("admin");
             else setUserRole("user");
         };

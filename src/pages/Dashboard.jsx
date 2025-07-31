@@ -110,7 +110,7 @@ export default function Dashboard() {
   }, [selectedSite]);
 
   const isAdmin = currentUser?.email.endsWith("@brightbots.in");
-  const isSuperAdmin = currentUser?.email === "mis@brightbots.in";
+  const isSuperAdmin = currentUser?.email === "dev@brightbots.in";
 
   const handleAddRBT = async () => {
     try {
