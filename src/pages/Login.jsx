@@ -15,6 +15,7 @@ function Login() {
     e.preventDefault();
     setErr("");
     setLoading(true);
+
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const user = userCred.user;
@@ -25,17 +26,31 @@ function Login() {
         return;
       }
 
-      // Check or create user document in Firestore
-      const userRef = doc(db, "users", user.uid);
+      // Use email as document ID to prevent duplicates
+      const userRef = doc(db, "users", user.email);
       const docSnap = await getDoc(userRef);
 
       if (!docSnap.exists()) {
+        // Assign roles properly
         const role = user.email === "dev@brightbots.in" ? "super_admin" : "user";
+
         await setDoc(userRef, {
           email: user.email,
           emailVerified: user.emailVerified,
           role,
         });
+      } else {
+        // Update emailVerified if changed
+        await setDoc(
+          userRef,
+          { emailVerified: user.emailVerified },
+          { merge: true }
+        );
+
+        // Ensure role for dev@brightbots.in is always super_admin
+        if (user.email === "dev@brightbots.in") {
+          await setDoc(userRef, { role: "super_admin" }, { merge: true });
+        }
       }
 
       navigate("/dashboard");

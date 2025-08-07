@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { logAndUpdateField } from "../utils/db";
 import {
@@ -17,63 +17,141 @@ import {
     FormControl,
     Select,
     MenuItem,
+    Checkbox,
+    FormControlLabel,
 } from "@mui/material";
 
-const RBTDataGrid = ({ client, site }) => {
+const ALL_PARTS = [
+    "ANTENA CABLE", "ANTENA PORT", "BATTERY", "BATTERY BOX", "BRUSH MOTOR",
+    "CHARGE CONTROLLER", "GUIDE WHEEL 1", "GUIDE WHEEL 2", "GUIDE WHEEL 3", "GUIDE WHEEL 4",
+    "HOME SENSOR", "LIMIT SWITCH 1", "LIMIT SWITCH 2", "LOAD WHEEL 1", "LOAD WHEEL 2",
+    "LOAD WHEEL 3", "LOAD WHEEL 4", "LT 1", "LT 2", "PCB BOX", "PULSE COUNT", "PV MODULE",
+    "REPEATER PCB", "RTC", "SS PIPE", "SSC", "STEPPER DRIVE", "STEPPER MOTOR", "TC BELT",
+    "TC LOAD WHEEL", "XBEE"
+].sort();
+
+const generateDefaultPartIssues = () => {
+    const defaults = {};
+    ALL_PARTS.forEach((part) => {
+        defaults[part] = { selected: false, dispatch_date: "", delivery_date: "" };
+    });
+    return defaults;
+};
+
+const RBTDataGrid = ({ client, sites }) => {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedRBT, setSelectedRBT] = useState(null);
     const [partIssues, setPartIssues] = useState({});
+    const [userRole, setUserRole] = useState("user");
     const userEmail = auth.currentUser?.email || "";
 
-    // Fetch RBTs
+    // ✅ Fetch user role
+    useEffect(() => {
+        const fetchRole = async () => {
+            if (userEmail) {
+                const userRef = doc(db, "users", auth.currentUser.uid);
+                const userSnap = await getDoc(userRef);
+                if (userSnap.exists()) {
+                    setUserRole(userSnap.data().role || "user");
+                }
+            }
+        };
+        fetchRole();
+    }, [userEmail]);
+
+    // ✅ Fetch RBTs (multi-site)
     useEffect(() => {
         const fetchRBTs = async () => {
-            if (!client || !site) return;
+            if (!client || !sites || sites.length === 0) {
+                setRows([]);
+                return;
+            }
             setLoading(true);
-            const snapshot = await getDocs(collection(db, "clients", client, "sites", site, "rbts"));
-            const data = snapshot.docs.map((doc) => {
-                const rbtData = doc.data();
-                return {
-                    id: doc.id,
-                    running_status: rbtData.running_status || "Auto",
-                    breakdown_status: rbtData.breakdown_status || "N/A",
-                    work: rbtData.work || "",
-                    ...rbtData,
-                };
-            });
 
-            const sortedData = data.sort((a, b) => {
-                const numA = parseInt(a.id.replace(/\D/g, ""), 10);
-                const numB = parseInt(b.id.replace(/\D/g, ""), 10);
-                return numA - numB;
-            });
+            try {
+                const allRBTs = await Promise.all(
+                    sites.map(async (site) => {
+                        const snapshot = await getDocs(collection(db, "clients", client, "sites", site, "rbts"));
+                        return snapshot.docs.map((docSnap) => {
+                            const rbtData = docSnap.data();
+                            return {
+                                id: docSnap.id,
+                                site, // ✅ Correct site mapping
+                                running_status: rbtData.running_status || "Auto",
+                                breakdown_status: rbtData.breakdown_status || "N/A",
+                                work: rbtData.work || "",
+                                part_issues: { ...generateDefaultPartIssues(), ...(rbtData.part_issues || {}) },
+                                ...rbtData,
+                            };
+                        });
+                    })
+                );
 
-            setRows(sortedData);
+                const mergedRBTs = allRBTs.flat();
+
+                // ✅ Sort by site and RBT number
+                mergedRBTs.sort((a, b) => {
+                    if (a.site !== b.site) return a.site.localeCompare(b.site);
+                    const numA = parseInt(a.id.replace(/\D/g, ""), 10) || 0;
+                    const numB = parseInt(b.id.replace(/\D/g, ""), 10) || 0;
+                    return numA - numB;
+                });
+
+                setRows(mergedRBTs);
+            } catch (error) {
+                console.error("Error fetching RBTs:", error);
+            }
             setLoading(false);
         };
         fetchRBTs();
-    }, [client, site]);
+    }, [client, sites]);
 
-    const handlePartIssueChange = (part, field, val) => {
-        setPartIssues((prev) => ({
-            ...prev,
-            [part]: {
-                ...prev[part],
-                [field]: val,
-            },
-        }));
-    };
-
-    const handleSavePartIssues = async () => {
-        await logAndUpdateField(client, site, selectedRBT, "part_issues", {}, partIssues);
+    // ✅ Auto-save part issues
+    const autoSavePartIssues = async (updatedIssues) => {
+        if (!selectedRBT) return;
+        const rbtRef = doc(db, "clients", client, "sites", selectedRBT.site, "rbts", selectedRBT.id);
+        await updateDoc(rbtRef, { part_issues: updatedIssues });
+        await logAndUpdateField(client, selectedRBT.site, selectedRBT.id, "part_issues", {}, updatedIssues);
         setRows((prev) =>
-            prev.map((r) => (r.id === selectedRBT ? { ...r, part_issues: partIssues } : r))
+            prev.map((r) => (r.id === selectedRBT.id && r.site === selectedRBT.site ? { ...r, part_issues: updatedIssues } : r))
         );
-        setSelectedRBT(null);
     };
 
-    // Status color mapping
+    const handlePartIssueChange = async (part, field, value) => {
+        const updated = {
+            ...partIssues,
+            [part]: { ...partIssues[part], [field]: value },
+        };
+        setPartIssues(updated);
+        await autoSavePartIssues(updated);
+    };
+
+    const togglePartSelection = async (part) => {
+        const updated = {
+            ...partIssues,
+            [part]: {
+                ...partIssues[part],
+                selected: !partIssues[part]?.selected,
+                dispatch_date: !partIssues[part]?.selected ? "" : partIssues[part].dispatch_date,
+                delivery_date: !partIssues[part]?.selected ? "" : partIssues[part].delivery_date,
+            },
+        };
+        setPartIssues(updated);
+        await autoSavePartIssues(updated);
+    };
+
+    // ✅ Delete RBT (Super Admin only)
+    const handleDeleteRBT = async (rbt) => {
+        if (userRole !== "super_admin") {
+            alert("Only Super Admin can delete RBTs.");
+            return;
+        }
+        if (!window.confirm(`Are you sure you want to delete ${rbt.id}?`)) return;
+        await deleteDoc(doc(db, "clients", client, "sites", rbt.site, "rbts", rbt.id));
+        setRows((prev) => prev.filter((row) => !(row.id === rbt.id && row.site === rbt.site)));
+    };
+
     const getStatusColor = (field, value) => {
         if (field === "running_status") {
             if (value === "Auto") return "success";
@@ -96,58 +174,27 @@ const RBTDataGrid = ({ client, site }) => {
     };
 
     const renderDropdown = (params, field, options) => (
-        <FormControl
-            size="small"
-            sx={{
-                minWidth: 140,
-                "& .MuiOutlinedInput-root": {
-                    background: "#ffffff",
-                    color: "#111827",
-                    borderRadius: "8px",
-                    border: "1px solid #4f46e5",
-                    "&:hover": {
-                        borderColor: "#7c3aed",
-                        boxShadow: "0 0 6px rgba(124, 58, 237, 0.4)",
-                    },
-                },
-                "& .MuiSelect-select": { padding: "6px 12px" },
-                "& .MuiSelect-icon": { color: "#4f46e5" },
-            }}
-        >
+        <FormControl size="small" sx={{ minWidth: 140 }}>
             <Select
                 value={params.value || ""}
                 onChange={async (e) => {
                     const newValue = e.target.value;
                     const oldValue = params.value;
-
-                    await logAndUpdateField(client, site, params.row.id, field, oldValue, newValue);
+                    await logAndUpdateField(client, params.row.site, params.row.id, field, oldValue, newValue);
 
                     setRows((prev) =>
-                        prev.map((r) => (r.id === params.row.id ? { ...r, [field]: newValue } : r))
+                        prev.map((r) =>
+                            r.id === params.row.id && r.site === params.row.site ? { ...r, [field]: newValue } : r
+                        )
                     );
 
                     if (
                         (field === "running_status" && (newValue === "Manual" || newValue === "Not Running")) ||
-                        (field === "breakdown_status" &&
-                            (newValue === "Breakdown" || newValue === "Running With Issue"))
+                        (field === "breakdown_status" && (newValue === "Breakdown" || newValue === "Running With Issue"))
                     ) {
-                        setSelectedRBT(params.row.id);
-                        setPartIssues(params.row.part_issues || {});
+                        setSelectedRBT(params.row);
+                        setPartIssues(params.row.part_issues || generateDefaultPartIssues());
                     }
-                }}
-                MenuProps={{
-                    PaperProps: {
-                        sx: {
-                            borderRadius: "8px",
-                            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.12)",
-                            "& .MuiMenuItem-root": {
-                                fontSize: 14,
-                                "&:hover": {
-                                    backgroundColor: "rgba(79, 70, 229, 0.1)",
-                                },
-                            },
-                        },
-                    },
                 }}
             >
                 {options.map((opt) => (
@@ -160,7 +207,6 @@ const RBTDataGrid = ({ client, site }) => {
                                 fontWeight: "bold",
                                 minWidth: "100px",
                                 justifyContent: "center",
-                                textTransform: "capitalize",
                             }}
                         />
                     </MenuItem>
@@ -170,7 +216,8 @@ const RBTDataGrid = ({ client, site }) => {
     );
 
     const columns = [
-        { field: "id", headerName: "RBT ID", width: 120, editable: false },
+        { field: "site", headerName: "Site", width: 150 },
+        { field: "id", headerName: "RBT ID", width: 120 },
         { field: "cleaner_did", headerName: "Cleaner DID", width: 180 },
         { field: "tc_did", headerName: "TC DID", width: 180 },
         { field: "cl_pcb_model", headerName: "CL PCB Model", width: 150 },
@@ -203,22 +250,31 @@ const RBTDataGrid = ({ client, site }) => {
                     "Auto Scheduling",
                 ]),
         },
+        ...(userRole === "super_admin"
+            ? [
+                {
+                    field: "actions",
+                    headerName: "Actions",
+                    width: 120,
+                    renderCell: (params) => (
+                        <Button
+                            variant="contained"
+                            color="error"
+                            size="small"
+                            onClick={() => handleDeleteRBT(params.row)}
+                        >
+                            Delete
+                        </Button>
+                    ),
+                },
+            ]
+            : []),
     ];
 
     return (
-        <Box
-            sx={{
-                height: 650,
-                width: "100%",
-                p: 2,
-                backgroundColor: "#fff",
-                borderRadius: 3,
-                boxShadow: 4,
-                fontFamily: "'Roboto', sans-serif",
-            }}
-        >
+        <Box sx={{ height: 650, width: "100%", p: 2, backgroundColor: "#fff", borderRadius: 3, boxShadow: 4 }}>
             <Typography variant="h6" mb={2} fontWeight="bold" color="primary">
-                RBT Dashboard - {site}
+                RBT Dashboard - {Array.isArray(sites) ? sites.join(", ") : sites || "No Site Selected"}
             </Typography>
 
             <DataGrid
@@ -230,54 +286,70 @@ const RBTDataGrid = ({ client, site }) => {
                     Toolbar: GridToolbar,
                     LoadingOverlay: LinearProgress,
                 }}
-                sx={{
-                    fontSize: 14,
-                    "& .MuiDataGrid-columnHeaders": {
-                        backgroundColor: "#f4f6f8",
-                        color: "#333",
-                        fontWeight: "bold",
-                        fontSize: 14,
-                    },
-                    "& .MuiDataGrid-row": {
-                        "&:nth-of-type(odd)": { backgroundColor: "#fafafa" },
-                    },
-                    "& .MuiDataGrid-cell": { fontSize: 13 },
-                }}
             />
 
             {/* Part Issue Modal */}
             <Dialog open={Boolean(selectedRBT)} onClose={() => setSelectedRBT(null)} maxWidth="sm" fullWidth>
-                <DialogTitle>Part Issue - {selectedRBT}</DialogTitle>
+                <DialogTitle>Part Issue - {selectedRBT?.id}</DialogTitle>
                 <DialogContent dividers>
-                    {Object.keys(partIssues || {}).length === 0 ? (
-                        <Typography color="textSecondary">No parts to update.</Typography>
-                    ) : (
-                        Object.keys(partIssues).map((part) => (
-                            <Box key={part} display="flex" alignItems="center" gap={2} mt={2}>
-                                <Typography sx={{ width: "150px", fontWeight: 500 }}>{part}</Typography>
-                                <TextField
-                                    type="date"
-                                    label="Dispatch Date"
-                                    size="small"
-                                    value={partIssues[part]?.dispatch_date || ""}
-                                    onChange={(e) => handlePartIssueChange(part, "dispatch_date", e.target.value)}
-                                />
-                                <TextField
-                                    type="date"
-                                    label="Delivery Date"
-                                    size="small"
-                                    value={partIssues[part]?.delivery_date || ""}
-                                    onChange={(e) => handlePartIssueChange(part, "delivery_date", e.target.value)}
-                                />
-                            </Box>
-                        ))
-                    )}
+                    <Box display="flex" flexDirection="column" gap={2}>
+                        {Object.keys(partIssues || {}).sort().map((part) => {
+                            const isSelected = partIssues[part]?.selected;
+                            return (
+                                <Box
+                                    key={part}
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={3}
+                                    sx={{
+                                        padding: "6px 0",
+                                        borderBottom: "1px solid #eee",
+                                    }}
+                                >
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={!!isSelected}
+                                                onChange={() => togglePartSelection(part)}
+                                            />
+                                        }
+                                        label={<Typography sx={{ minWidth: 150, fontWeight: 500 }}>{part}</Typography>}
+                                        sx={{ flex: 1 }}
+                                    />
+
+                                    {isSelected && (
+                                        <Box display="flex" gap={2} flexWrap="wrap" sx={{ flex: 2 }}>
+                                            <TextField
+                                                type="date"
+                                                label="Dispatch Date"
+                                                size="small"
+                                                value={partIssues[part]?.dispatch_date || ""}
+                                                onChange={(e) =>
+                                                    handlePartIssueChange(part, "dispatch_date", e.target.value)
+                                                }
+                                                sx={{ minWidth: 160 }}
+                                                InputLabelProps={{ shrink: true }}
+                                            />
+                                            <TextField
+                                                type="date"
+                                                label="Delivery Date"
+                                                size="small"
+                                                value={partIssues[part]?.delivery_date || ""}
+                                                onChange={(e) =>
+                                                    handlePartIssueChange(part, "delivery_date", e.target.value)
+                                                }
+                                                sx={{ minWidth: 160 }}
+                                                InputLabelProps={{ shrink: true }}
+                                            />
+                                        </Box>
+                                    )}
+                                </Box>
+                            );
+                        })}
+                    </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setSelectedRBT(null)}>Cancel</Button>
-                    <Button onClick={handleSavePartIssues} variant="contained" color="primary">
-                        Save
-                    </Button>
+                    <Button onClick={() => setSelectedRBT(null)}>Close</Button>
                 </DialogActions>
             </Dialog>
         </Box>

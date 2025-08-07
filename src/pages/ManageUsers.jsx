@@ -5,6 +5,7 @@ import {
     collection,
     getDocs,
     updateDoc,
+    deleteDoc,
     doc
 } from "firebase/firestore";
 
@@ -23,15 +24,44 @@ export default function ManageUsers() {
 
     const fetchUsers = async () => {
         const snapshot = await getDocs(collection(db, "users"));
-        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setUsers(userList);
+        const allUsers = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+
+        const uniqueUsers = [];
+        const seenEmails = new Map();
+
+        // Deduplicate users and remove duplicates from Firestore
+        for (const user of allUsers) {
+            if (!seenEmails.has(user.email)) {
+                seenEmails.set(user.email, user.id);
+                uniqueUsers.push(user);
+            } else {
+                // Delete duplicate from Firestore
+                await deleteDoc(doc(db, "users", user.id));
+                console.log(`🗑 Removed duplicate user: ${user.email}`);
+            }
+        }
+
+        setUsers(uniqueUsers);
     };
 
     const makeAdmin = async (userId, email) => {
-        if (email === "dev@brightbots.in") return; // extra safeguard
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, { role: "admin" });
+        if (email === "dev@brightbots.in") return; // safeguard
+        await updateDoc(doc(db, "users", userId), { role: "admin" });
         fetchUsers();
+    };
+
+    const removeAdmin = async (userId, email) => {
+        if (email === "dev@brightbots.in") return;
+        await updateDoc(doc(db, "users", userId), { role: "user" });
+        fetchUsers();
+    };
+
+    const removeUser = async (userId, email) => {
+        if (email === "dev@brightbots.in") return; // cannot delete super admin
+        if (window.confirm(`Are you sure you want to remove ${email}?`)) {
+            await deleteDoc(doc(db, "users", userId));
+            fetchUsers();
+        }
     };
 
     return (
@@ -81,14 +111,32 @@ export default function ManageUsers() {
                                         <span className="text-red-500 font-semibold">❌</span>
                                     )}
                                 </td>
-                                <td className="px-4 py-2">
-                                    {user.email !== "dev@brightbots.in" && user.role !== "admin" && (
-                                        <button
-                                            onClick={() => makeAdmin(user.id, user.email)}
-                                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium"
-                                        >
-                                            Make Admin
-                                        </button>
+                                <td className="px-4 py-2 space-x-2">
+                                    {user.email !== "dev@brightbots.in" && (
+                                        <>
+                                            {user.role !== "admin" ? (
+                                                <button
+                                                    onClick={() => makeAdmin(user.id, user.email)}
+                                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium"
+                                                >
+                                                    Make Admin
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => removeAdmin(user.id, user.email)}
+                                                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-xs font-medium"
+                                                >
+                                                    Remove Admin
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => removeUser(user.id, user.email)}
+                                                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium"
+                                            >
+                                                Remove User
+                                            </button>
+                                        </>
                                     )}
                                 </td>
                             </tr>

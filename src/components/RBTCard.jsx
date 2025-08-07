@@ -15,7 +15,7 @@ const RBTCard = ({ client, site, rbt, filters, refreshData }) => {
 
     const userEmail = auth.currentUser?.email || "";
     const isAdmin = userEmail.endsWith("@brightbots.in");
-    const isSuperAdmin = userEmail === "mis@brightbots.in";
+    const isSuperAdmin = userEmail === "dev@brightbots.in";
 
     const rbtRef =
         client && site && rbt?.rbt_id

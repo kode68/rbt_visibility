@@ -17,3 +17,7 @@ yarn-error.log*
 
 # Environment files
 .env
+node_modules/
+
+firestore-batch-updater/rbt-app-a30e8-e9b17d081302.json
+firestore-batch-updater/node_modules
