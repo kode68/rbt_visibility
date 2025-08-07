@@ -45,8 +45,6 @@ const defaultPartIssues = {
   "XBEE": { dispatch_date: "", delivery_date: "" },
 };
 
-// ... (imports and defaultPartIssues remain same)
-
 export default function Dashboard() {
   const [clients, setClients] = useState([]);
   const [sites, setSites] = useState([]);
@@ -60,7 +58,6 @@ export default function Dashboard() {
   const [partIssues, setPartIssues] = useState({});
   const navigate = useNavigate();
 
-  // ✅ Auth check
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
       if (!user) {
@@ -88,7 +85,6 @@ export default function Dashboard() {
     return unsub;
   }, [navigate]);
 
-  // ✅ Fetch clients
   useEffect(() => {
     const unsubClients = onSnapshot(collection(db, "clients"), (snapshot) => {
       setClients(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
@@ -96,14 +92,12 @@ export default function Dashboard() {
     return unsubClients;
   }, []);
 
-  // ✅ Handle client change
   const handleClientChange = (clientId) => {
     setSelectedClient(clientId);
     setSelectedSites([]);
     setRbtList([]);
   };
 
-  // ✅ Fetch sites
   useEffect(() => {
     if (!selectedClient) return;
     const sitesRef = collection(db, `clients/${selectedClient}/sites`);
@@ -113,11 +107,10 @@ export default function Dashboard() {
     return unsubSites;
   }, [selectedClient]);
 
-  // ✅ Fetch RBT list for multiple sites (FIXED)
   useEffect(() => {
     if (!selectedClient || selectedSites.length === 0) return;
-
     setLoading(true);
+    setRbtList([]);
     const fetchRBTs = async () => {
       try {
         const allRBTs = await Promise.all(
@@ -131,8 +124,7 @@ export default function Dashboard() {
             }));
           })
         );
-
-        setRbtList(allRBTs.flat()); // Combine all sites' robots into one array
+        setRbtList(allRBTs.flat());
       } catch (err) {
         console.error("Error fetching RBTs:", err);
         toast.error("Failed to fetch robots");
@@ -142,17 +134,16 @@ export default function Dashboard() {
     };
 
     fetchRBTs();
-  }, [selectedClient, selectedSites]);
+  }, [selectedClient, JSON.stringify(selectedSites)]);
 
-  // ✅ Role checks
   const isAdmin = currentUser?.email?.endsWith("@brightbots.in");
   const isSuperAdmin = currentUser?.email === "dev@brightbots.in";
 
-  // ✅ Add RBT
   const handleAddRBT = async () => {
-    if (!selectedClient || selectedSites.length === 0) return toast.error("Select client & site first!");
+    if (!selectedClient || selectedSites.length === 0)
+      return toast.error("Select client & site first!");
     try {
-      const site = selectedSites[0]; // Add to the first selected site
+      const site = selectedSites[0];
       const siteRbts = rbtList.filter((r) => r.site === site);
       const nextId = siteRbts.length + 1;
       const newRbtId = `RBT${nextId}`;
@@ -178,7 +169,6 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ Delete RBT
   const handleDeleteRBT = async (rbt_id, site) => {
     if (!isSuperAdmin) return toast.error("Only Super Admin can delete RBTs");
     if (!window.confirm(`Delete ${rbt_id}? This cannot be undone.`)) return;
@@ -194,7 +184,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 px-6 py-8 font-sans">
-      {/* Header */}
       <div className="flex items-center justify-between mb-10 border-b pb-4">
         <div className="flex items-center gap-4">
           <img
@@ -238,7 +227,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Client & Site Selector */}
       <div className="mb-8 flex gap-4">
         <div>
           <label className="block text-gray-700 mb-1">Select Client:</label>
@@ -263,7 +251,12 @@ export default function Dashboard() {
               <Select
                 multiple
                 value={selectedSites}
-                onChange={(e) => setSelectedSites(e.target.value)}
+                onChange={(e) => {
+                  const {
+                    target: { value },
+                  } = e;
+                  setSelectedSites(typeof value === "string" ? value.split(",") : value);
+                }}
                 renderValue={(selected) => (selected.length > 0 ? selected.join(", ") : "-- Select Sites --")}
               >
                 {sites.map((site) => (
@@ -278,7 +271,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* RBT DataGrid */}
       {selectedClient && selectedSites.length > 0 && (
         <>
           <div className="flex justify-between items-center mb-6">
@@ -314,7 +306,6 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Part Issue Section */}
       {selectedRBT && (
         <PartIssueSection
           client={selectedClient}
@@ -327,4 +318,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

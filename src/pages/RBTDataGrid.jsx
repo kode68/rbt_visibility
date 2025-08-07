@@ -105,7 +105,9 @@ const RBTDataGrid = ({ client, sites }) => {
             setLoading(false);
         };
         fetchRBTs();
-    }, [client, sites]);
+    // }, [client, sites]);
+    }, [client, JSON.stringify(sites)]);
+
 
     // ✅ Auto-save part issues
     const autoSavePartIssues = async (updatedIssues) => {
@@ -277,16 +279,28 @@ const RBTDataGrid = ({ client, sites }) => {
                 RBT Dashboard - {Array.isArray(sites) ? sites.join(", ") : sites || "No Site Selected"}
             </Typography>
 
-            <DataGrid
-                rows={rows}
-                columns={columns}
-                loading={loading}
-                disableSelectionOnClick
-                components={{
-                    Toolbar: GridToolbar,
-                    LoadingOverlay: LinearProgress,
-                }}
-            />
+           {sites.map((site) => (
+  <Box key={site} mb={4}>
+    <Typography variant="h6" color="secondary" gutterBottom>
+      Site: {site}
+    </Typography>
+    <DataGrid
+      autoHeight
+      loading={loading}
+      rows={rows.filter((r) => r.site === site)}
+      columns={columns}
+      components={{
+        Toolbar: GridToolbar,
+        LoadingOverlay: LinearProgress,
+      }}
+      sx={{
+        borderRadius: 2,
+        boxShadow: 2,
+      }}
+    />
+  </Box>
+))}
+
 
             {/* Part Issue Modal */}
             <Dialog open={Boolean(selectedRBT)} onClose={() => setSelectedRBT(null)} maxWidth="sm" fullWidth>
