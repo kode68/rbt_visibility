@@ -19,5 +19,7 @@ yarn-error.log*
 .env
 node_modules/
 
-firestore-batch-updater/rbt-app-a30e8-e9b17d081302.json
+firestore-batch-updater/new-project-service-account.json
 firestore-batch-updater/node_modules
+firestore-batch-updater/rbt-app-77196-firebase-adminsdk-fbsvc-e109c77d41.json
+**/node_modules/

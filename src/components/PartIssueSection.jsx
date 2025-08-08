@@ -26,7 +26,10 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
     const [selectedParts, setSelectedParts] = useState({});
     const [showParts, setShowParts] = useState(false);
 
-    const rbtRef = doc(db, "clients", client, "sites", site, "rbts", rbtId);
+    const rbtRef =
+        client && site && rbtId
+            ? doc(db, "clients", client, "sites", site, "rbts", rbtId)
+            : null;
 
     // Show parts only if conditions match
     useEffect(() => {
@@ -35,77 +38,81 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
             ["Manual", "Not Running"].includes(rbt.running_status || "") ||
             (rbt.breakdown_status && rbt.breakdown_status !== "N/A");
         setShowParts(canShowParts);
-    }, [rbt?.breakdown_status, rbt?.running_status]);
+    }, [rbt?.breakdown_status, rbt?.running_status, rbt]);
 
     // Initialize part issues
     useEffect(() => {
-        if (rbt) {
-            const defaultParts = generateDefaultPartIssues();
-            const existing = rbt.part_issues || {};
-            const merged = {};
+        if (!rbt) return;
+        const defaults = generateDefaultPartIssues();
+        const existing = rbt.part_issues || {};
+        const merged = {};
 
-            ALL_PARTS.forEach((part) => {
-                merged[part] = {
-                    dispatch_date: existing[part]?.dispatch_date || "",
-                    delivery_date: existing[part]?.delivery_date || "",
-                };
-            });
+        ALL_PARTS.forEach((part) => {
+            merged[part] = {
+                dispatch_date: existing[part]?.dispatch_date || "",
+                delivery_date: existing[part]?.delivery_date || "",
+            };
+        });
 
-            setSelectedParts(merged);
-            if (typeof onPartIssueChange === "function") onPartIssueChange(merged);
-        }
+        setSelectedParts(merged);
+        if (typeof onPartIssueChange === "function") onPartIssueChange(merged);
     }, [rbt]);
 
     if (!client || !site || !rbtId || !rbt) {
         return <p className="text-red-500 text-sm">Loading part issues...</p>;
     }
 
+    // ---------- helpers ----------
+    const writeAndLog = async (path, oldVal, newVal) => {
+        if (!rbtRef) return;
+        // avoid redundant writes/logs
+        const same =
+            typeof oldVal === "object"
+                ? JSON.stringify(oldVal) === JSON.stringify(newVal)
+                : oldVal === newVal;
+        if (same) return;
+
+        await updateDoc(rbtRef, {
+            [path]: newVal,
+            last_updated: serverTimestamp(),
+        });
+        await logAndUpdateField(client, site, rbtId, path, oldVal, newVal);
+    };
+
+    const setLocalAndEmit = (next) => {
+        setSelectedParts(next);
+        if (typeof onPartIssueChange === "function") onPartIssueChange(next);
+    };
+
     // Toggle part selection (auto-save to Firestore)
+    // Selection is defined as "any date set". When toggling off, we clear both dates.
     const togglePart = async (part) => {
-        const updated = { ...selectedParts };
-        const isSelected = !!(updated[part]?.dispatch_date || updated[part]?.delivery_date);
+        const prevObj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
+        const isSelected = !!(prevObj.dispatch_date || prevObj.delivery_date);
 
-        if (isSelected) {
-            // Unselect part
-            updated[part] = { dispatch_date: "", delivery_date: "" };
-            await updateDoc(rbtRef, {
-                [`part_issues.${part}`]: updated[part],
-                last_updated: serverTimestamp(),
-            });
-            await logAndUpdateField(client, site, rbtId, `part_issues.${part}`, "Selected", "Cleared");
-        } else {
-            // Select part
-            updated[part] = { dispatch_date: "", delivery_date: "" };
-            await updateDoc(rbtRef, {
-                [`part_issues.${part}`]: updated[part],
-                last_updated: serverTimestamp(),
-            });
-            await logAndUpdateField(client, site, rbtId, `part_issues.${part}`, "Cleared", "Selected");
-        }
+        const nextObj = isSelected
+            ? { dispatch_date: "", delivery_date: "" } // unselect -> clear
+            : { dispatch_date: "", delivery_date: "" }; // select -> start empty dates
 
-        setSelectedParts(updated);
-        if (typeof onPartIssueChange === "function") onPartIssueChange(updated);
+        // Log full object change for the part
+        await writeAndLog(`part_issues.${part}`, prevObj, nextObj);
+
+        const updated = { ...selectedParts, [part]: nextObj };
+        setLocalAndEmit(updated);
     };
 
     // Update dispatch or delivery date
     const updateDate = async (part, field, value) => {
-        const prevValue = selectedParts[part]?.[field] || "";
+        const prevObj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
+        const prevValue = prevObj[field] || "";
         if (prevValue === value) return;
 
-        const updated = {
-            ...selectedParts,
-            [part]: { ...selectedParts[part], [field]: value },
-        };
+        // Write specific nested field
+        await writeAndLog(`part_issues.${part}.${field}`, prevValue, value);
 
-        setSelectedParts(updated);
-        if (typeof onPartIssueChange === "function") onPartIssueChange(updated);
-
-        await updateDoc(rbtRef, {
-            [`part_issues.${part}.${field}`]: value,
-            last_updated: serverTimestamp(),
-        });
-
-        await logAndUpdateField(client, site, rbtId, `part_issues.${part}.${field}`, prevValue, value);
+        const nextObj = { ...prevObj, [field]: value };
+        const updated = { ...selectedParts, [part]: nextObj };
+        setLocalAndEmit(updated);
     };
 
     if (!showParts) return null;
@@ -120,7 +127,9 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
             <div className="flex-1 overflow-y-auto mb-4 pr-2">
                 <div className="grid grid-cols-2 gap-3">
                     {ALL_PARTS.map((part) => {
-                        const isSelected = selectedParts[part]?.dispatch_date || selectedParts[part]?.delivery_date;
+                        const obj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
+                        const isSelected = !!(obj.dispatch_date || obj.delivery_date);
+
                         return (
                             <div key={part} className="border rounded-lg p-3 bg-gray-50">
                                 <div className="flex justify-between items-center mb-2">
@@ -141,7 +150,7 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
                                             <label className="text-xs text-gray-500 mb-1">Dispatch</label>
                                             <input
                                                 type="date"
-                                                value={selectedParts[part]?.dispatch_date || ""}
+                                                value={obj.dispatch_date || ""}
                                                 onChange={(e) => updateDate(part, "dispatch_date", e.target.value)}
                                                 className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
@@ -150,7 +159,7 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
                                             <label className="text-xs text-gray-500 mb-1">Delivery</label>
                                             <input
                                                 type="date"
-                                                value={selectedParts[part]?.delivery_date || ""}
+                                                value={obj.delivery_date || ""}
                                                 onChange={(e) => updateDate(part, "delivery_date", e.target.value)}
                                                 className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
