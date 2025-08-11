@@ -18,33 +18,41 @@ export default function Signup() {
     setErr("");
     setLoading(true);
 
-    if (!email.endsWith("@brightbots.in")) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.endsWith("@brightbots.in")) {
       setErr("Only @brightbots.in emails are allowed.");
       setLoading(false);
       return;
     }
 
     try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
+      const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCred.user;
 
-      // Store user info in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
-        firstName,
-        lastName,
-        role: "user",
-        emailVerified: user.emailVerified,
-      });
+      // Store user info in Firestore (merge avoids overwriting on retries)
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          email: user.email,
+          firstName,
+          lastName,
+          role: "viewer",
+          emailVerified: user.emailVerified
+        },
+        { merge: true }
+      );
 
       await sendEmailVerification(user);
       alert("Verification email sent. Please verify before logging in.");
       navigate("/login");
     } catch (error) {
-      setErr(error.message);
+      let message = error?.message || "Failed to create account.";
+      if (error?.code === "auth/email-already-in-use") message = "This email is already registered.";
+      if (error?.code === "auth/weak-password") message = "Password is too weak. Try a stronger one.";
+      setErr(message);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -68,9 +76,7 @@ export default function Signup() {
 
         <form onSubmit={handleSignup} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              First Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
             <input
               type="text"
               value={firstName}
@@ -82,9 +88,7 @@ export default function Signup() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Last Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
             <input
               type="text"
               value={lastName}
@@ -134,8 +138,7 @@ export default function Signup() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full ${loading ? "bg-purple-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"
-              } text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-sm hover:shadow-md`}
+            className={`w-full ${loading ? "bg-purple-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"} text-white font-semibold py-2.5 rounded-lg transition duration-200 shadow-sm hover:shadow-md`}
           >
             {loading ? "Creating account..." : "Sign Up"}
           </button>

@@ -11,10 +11,9 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Detect if we're using local emulators (set in firebase.js)
-  const usingEmulators = Boolean(
-    typeof window !== "undefined" && window.__FIREBASE__ && window.__FIREBASE__.useEmulators
-  );
+  // Use the same flag as firebase.js
+  const usingEmulators =
+    String(process.env.REACT_APP_USE_FIREBASE_EMULATORS || "false").toLowerCase() === "true";
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -22,7 +21,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCred.user;
 
       // In production, require verified email. In emulator/local, skip this check.
@@ -58,8 +57,12 @@ function Login() {
       }
 
       navigate("/dashboard");
-    } catch (err) {
-      setErr("Login failed: " + err.message);
+    } catch (error) {
+      let message = error?.message || "Login failed";
+      if (error?.code === "auth/invalid-credential") {
+        message = "Invalid email or password.";
+      }
+      setErr("Login failed: " + message);
       setLoading(false);
     }
   };

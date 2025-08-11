@@ -1,9 +1,10 @@
 // src/index.jsx
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./index.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
-import AuthProvider, { useAuth, ProtectedRoute } from "./auth/AuthProvider";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 
 // --- Simple loading + error UI ---
@@ -50,21 +51,18 @@ function Forbidden() {
     );
 }
 
-// Wait for Firebase to resolve the auth state before rendering routes
-function RouterWithAuthGate() {
-    const { loading } = useAuth();
-    if (loading) return <LoadingScreen />;
-
+function AppRoutes() {
+    // ProtectedRoute already shows a loading state via react-firebase-hooks
     return (
         <Routes>
-            {/* Public route */}
+            {/* Public */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected app (any logged-in role is fine) */}
+            {/* Protected: your main app */}
             <Route
                 path="/*"
                 element={
-                    <ProtectedRoute roles={["viewer", "admin", "super_admin"]}>
+                    <ProtectedRoute>
                         <App />
                     </ProtectedRoute>
                 }
@@ -72,19 +70,18 @@ function RouterWithAuthGate() {
 
             {/* Forbidden + fallback */}
             <Route path="/403" element={<Forbidden />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
     <React.StrictMode>
         <ErrorBoundary>
-            <AuthProvider>
-                <BrowserRouter>
-                    <RouterWithAuthGate />
-                </BrowserRouter>
-            </AuthProvider>
+            <BrowserRouter>
+                <AppRoutes />
+            </BrowserRouter>
         </ErrorBoundary>
     </React.StrictMode>
 );

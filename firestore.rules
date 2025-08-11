@@ -1,110 +1,3 @@
-// rules_version = '2';
-// service cloud.firestore {
-//   match /databases/{database}/documents {
-
-//     /** ---------- Helpers ---------- **/
-//     function isSignedIn() {
-//       return request.auth != null;
-//     }
-
-//     // Caller role with safe fallbacks (no '??' in rules)
-//     function userRole() {
-//       return isSignedIn()
-//         ? (
-//             exists(/databases/$(database)/documents/users/$(request.auth.uid))
-//               ? (
-//                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != null
-//                     ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-//                     : "viewer"
-//                 )
-//               : "viewer"
-//           )
-//         : "viewer";
-//     }
-
-//     function hasAnyRole(roles) {
-//       return isSignedIn() && (userRole() in roles);
-//     }
-
-//     function isAdmin() {
-//       return hasAnyRole(["admin", "super_admin"]);
-//     }
-
-//     function isSuperAdmin() {
-//       return hasAnyRole(["super_admin"]);
-//     }
-
-//     // Toggle in emulators/dev project:
-//     // create /__meta/env with { mode: "dev" }
-//     function isDevMode() {
-//       return exists(/databases/$(database)/documents/__meta/env) &&
-//              get(/databases/$(database)/documents/__meta/env).data.mode == "dev";
-//     }
-
-//     /** ---------- USERS ---------- **/
-//     match /users/{uid} {
-//       // Read own profile or (optionally) via email equality or admin
-//       allow read: if isSignedIn() && (
-//         uid == request.auth.uid ||
-//         resource.data.email == request.auth.token.email ||
-//         isAdmin()
-//       );
-
-//       // Create own profile only (by doc id or by providing uid field)
-//       allow create: if isSignedIn() && (
-//         uid == request.auth.uid ||
-//         request.resource.data.uid == request.auth.uid
-//       );
-
-//       // Update: user can edit self *except* role; admins can edit anything
-//       allow update: if isSignedIn() && (
-//         (uid == request.auth.uid &&
-//           (!("role" in request.resource.data) ||
-//            request.resource.data.role == resource.data.role)) ||
-//         isAdmin()
-//       );
-
-//       // Delete: self or admin
-//       allow delete: if isSignedIn() && (uid == request.auth.uid || isAdmin());
-//     }
-
-//     /** ---------- BUSINESS DATA ---------- **/
-//     match /clients/{clientId} {
-//       allow read: if isSignedIn();
-//       allow create, update, delete: if isAdmin();
-
-//       match /sites/{siteId} {
-//         allow read: if isSignedIn();
-//         allow create, update, delete: if isAdmin();
-
-//         // If rbts live under sites
-//         match /rbts/{rbtId} {
-//           allow read: if isSignedIn();
-//           allow create, update, delete: if isAdmin();
-//         }
-//       }
-//     }
-
-//     // Also support collectionGroup('rbts') anywhere
-//     match /{path=**}/rbts/{rbtId} {
-//       allow read: if isSignedIn();
-//       allow create, update, delete: if isAdmin();
-//     }
-
-//     // Optional logs anywhere
-//     match /{path=**}/logs/{logId} {
-//       allow create: if isSignedIn();
-//       allow read, update, delete: if isAdmin();
-//     }
-
-//     /** ---------- DEV MODE OVERRIDE ---------- **/
-//     // While __meta/env.mode == "dev", let any signed-in user read & write.
-//     // Use this only in emulators or a separate dev project.
-//     match /{document=**} {
-//       allow read, write: if isSignedIn() && isDevMode();
-//     }
-//   }
-// }
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -126,8 +19,9 @@ service cloud.firestore {
         : "viewer";
     }
 
+    // Use list helper for membership
     function hasAnyRole(roles) {
-      return isSignedIn() && (userRole() in roles);
+      return isSignedIn() && roles.hasAny([userRole()]);
     }
 
     function isAdmin() {
@@ -182,19 +76,36 @@ service cloud.firestore {
         match /rbts/{rbtId} {
           allow read: if isSignedIn();
           allow create, update, delete: if isAdmin();
+
+          // rbt history (YYYY-MM-DD docs)
+          match /history/{dateKey} {
+            allow read: if isSignedIn();
+            allow create, update: if isAdmin();
+            allow delete: if isSuperAdmin();
+          }
         }
       }
     }
 
-    // Also allow reading rbts via collectionGroup anywhere
+    // Support collectionGroup('rbts') anywhere + its history
     match /{path=**}/rbts/{rbtId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
+
+      match /history/{dateKey} {
+        allow read: if isSignedIn();
+        allow create, update: if isAdmin();
+        allow delete: if isSuperAdmin();
+      }
     }
 
-    // Generic logs collections anywhere:
-    // - Any signed-in user can append logs (create only)
-    // - Only admins can read/update/delete logs
+    // Logs collections your app uses
+    match /rbt_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Generic logs pattern (if you have others named ".../logs")
     match /{path=**}/logs/{logId} {
       allow create: if isSignedIn();
       allow read, update, delete: if isAdmin();
@@ -208,4 +119,3 @@ service cloud.firestore {
     }
   }
 }
-

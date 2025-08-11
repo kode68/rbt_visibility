@@ -23,10 +23,14 @@ const serialize = (v) => {
     return String(v);
 };
 
-// ms → whole days (non-negative)
+// ms → whole days (non-negative) — safer for any input
 const diffDaysFromNow = (dateObj) => {
     if (!dateObj) return 0;
-    const ms = Date.now() - dateObj.getTime?.();
+    const t =
+        typeof dateObj.getTime === "function"
+            ? dateObj.getTime()
+            : new Date(dateObj).getTime();
+    const ms = Date.now() - t;
     if (isNaN(ms)) return 0;
     return Math.max(Math.floor(ms / (1000 * 60 * 60 * 24)), 0);
 };
@@ -66,12 +70,10 @@ export const logAndUpdateField = async (client, site, rbtId, field, oldValue, ne
                 updatePayload.running_not_running_at = null;
                 updatePayload.running_status_ageing = 0;
             } else if (newValue === "Manual") {
-                // Only set if not already set (preserve the older timestamp)
                 if (!prevManualAt) {
                     updatePayload.running_manual_at = nowServer;
                 }
-                // Compute ageing from the OLDER of (existing manual_at or now) vs existing not_running_at
-                const manualBase = prevManualAt || new Date(); // if we just set serverTimestamp, use now as base client-side
+                const manualBase = prevManualAt || new Date();
                 const older = prevNotRunAt
                     ? (manualBase < prevNotRunAt ? manualBase : prevNotRunAt)
                     : manualBase;

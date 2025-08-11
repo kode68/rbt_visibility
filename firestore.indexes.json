@@ -1,7 +1,7 @@
 ﻿{
     "indexes": [
         {
-            "collectionGroup": "rbts",
+            "collectionGroup": "rbt_logs",
             "queryScope": "COLLECTION",
             "fields": [
                 {
@@ -9,19 +9,69 @@
                     "order": "ASCENDING"
                 },
                 {
+                    "fieldPath": "timestamp",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "rbt_logs",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
                     "fieldPath": "site",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "running_status",
+                    "fieldPath": "timestamp",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "rbt_logs",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "rbt_id",
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "updatedAt",
+                    "fieldPath": "timestamp",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "rbt_logs",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "updated_by",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "timestamp",
                     "order": "DESCENDING"
                 }
             ]
         }
     ],
-    "fieldOverrides": []
+    "fieldOverrides": [
+        {
+            "collectionGroup": "rbts",
+            "fieldPath": "part_issues",
+            "indexes": []
+        },
+        {
+            "collectionGroup": "rbt_logs",
+            "fieldPath": "old_value",
+            "indexes": []
+        },
+        {
+            "collectionGroup": "rbt_logs",
+            "fieldPath": "new_value",
+            "indexes": []
+        }
+    ]
 }

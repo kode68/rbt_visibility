@@ -31,13 +31,13 @@ function Logs() {
     useEffect(() => {
         const unsub = auth.onAuthStateChanged((user) => {
             if (!user || !user.emailVerified) {
-                window.location.href = "/login";
+                navigate("/login", { replace: true });
             } else {
                 setCurrentUser(user);
             }
         });
         return unsub;
-    }, []);
+    }, [navigate]);
 
     useEffect(() => {
         const q = query(collection(db, "rbt_logs"), orderBy("timestamp", "desc"));
@@ -66,8 +66,6 @@ function Logs() {
         setFilteredLogs(filtered);
     }, [logs, startDate, endDate]);
 
-    // ---------- Helpers ----------
-
     const parseJSON = (val) => {
         if (val == null) return null;
         if (typeof val === "object") return val;
@@ -82,7 +80,6 @@ function Logs() {
         return obj ? JSON.stringify(obj, null, 2) : String(v ?? "—");
     };
 
-    // Is this a part_issues-shaped object? (values are objects with dispatch/delivery keys)
     const isPartIssues = (obj) =>
         obj &&
         typeof obj === "object" &&
@@ -90,7 +87,6 @@ function Logs() {
             (v) => v && typeof v === "object" && ("dispatch_date" in v || "delivery_date" in v)
         );
 
-    // Keep only parts that actually have at least one date
     const filterRelevantParts = (obj) => {
         if (!isPartIssues(obj)) return obj;
         const out = {};
@@ -102,7 +98,6 @@ function Logs() {
         return out;
     };
 
-    // Changed keys (shallow) — for part_issues we compare only relevant (filtered) parts
     const changedKeys = (oldVal, newVal, isPartField) => {
         const oldObj0 = parseJSON(oldVal);
         const newObj0 = parseJSON(newVal);
@@ -116,11 +111,9 @@ function Logs() {
         return diffs;
     };
 
-    // Compact renderer
     const renderCompact = (value, field, keysFilter = null) => {
         const obj0 = parseJSON(value);
 
-        // Special display for part_issues: show chips only for parts with dates
         if (isPartIssues(obj0)) {
             const obj = filterRelevantParts(obj0);
             const entries = Object.entries(obj);
@@ -164,7 +157,6 @@ function Logs() {
             );
         }
 
-        // Generic JSON object case (non-parts)
         if (obj0 && typeof obj0 === "object") {
             const entries = Object.entries(obj0).filter(
                 ([k]) => !keysFilter || keysFilter.includes(k)
@@ -202,7 +194,6 @@ function Logs() {
             );
         }
 
-        // Primitive string/number
         const s = value == null || value === "" ? "—" : String(value);
         const isLong = s.length > 60;
         return (
@@ -211,8 +202,6 @@ function Logs() {
             </div>
         );
     };
-
-    // ---------- Actions ----------
 
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this log entry?")) return;
@@ -253,8 +242,6 @@ function Logs() {
     const handleChange = (field, value) =>
         setEditedLog((p) => ({ ...p, [field]: value }));
 
-    // ---------- CSV (with filtered part_issues) ----------
-
     const csvEscape = (val) => {
         const s = String(val ?? "");
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -280,7 +267,6 @@ function Logs() {
             return { oldStr: toStr(oldObj) || "-", newStr: toStr(newObj) || "-" };
         }
 
-        // non-parts
         return {
             oldStr: typeof oldVal === "string" ? oldVal : JSON.stringify(oldVal ?? "-"),
             newStr: typeof newVal === "string" ? newVal : JSON.stringify(newVal ?? "-"),
@@ -307,8 +293,6 @@ function Logs() {
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
         saveAs(blob, `rbt_logs_export_${Date.now()}.csv`);
     };
-
-    // ---------- UI ----------
 
     return (
         <div className="min-h-screen bg-gray-100 p-6 font-sans">

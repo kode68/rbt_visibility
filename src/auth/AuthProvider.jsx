@@ -37,17 +37,20 @@ const normalizeRole = (val) => (["viewer", "admin", "super_admin"].includes(val)
 
 /**
  * Create or patch users/{uid} profile on first login.
+ * - Also auto-promote dev@brightbots.in to super_admin (and enforce thereafter).
  */
 async function ensureUserProfile(user) {
     if (!user?.uid) return null;
+
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
+    const isDev = user.email === "dev@brightbots.in";
 
     if (!snap.exists()) {
         const payload = {
             email: user.email || null,
             name: user.displayName || null,
-            role: "viewer", // default
+            role: isDev ? "super_admin" : "viewer", // default or super_admin for dev
             photoURL: user.photoURL || null,
             createdAt: serverTimestamp(),
             lastLoginAt: serverTimestamp(),
@@ -55,9 +58,16 @@ async function ensureUserProfile(user) {
         await setDoc(ref, payload, { merge: true });
         return payload;
     } else {
-        // Update lastLoginAt on each login
-        await setDoc(ref, { lastLoginAt: serverTimestamp() }, { merge: true });
-        return snap.data();
+        const existing = snap.data() || {};
+        const patch = { lastLoginAt: serverTimestamp() };
+        // Enforce super_admin for dev account even if doc was edited
+        if (isDev && existing.role !== "super_admin") {
+            patch.role = "super_admin";
+        }
+        if (Object.keys(patch).length) {
+            await setDoc(ref, patch, { merge: true });
+        }
+        return { ...existing, ...patch };
     }
 }
 
@@ -69,9 +79,7 @@ async function fetchUserRole(uid) {
     try {
         const snap = await getDoc(doc(db, "users", uid));
         if (snap.exists()) return normalizeRole(snap.data()?.role);
-    } catch (_) {
-
-    }
+    } catch (_) { }
     return "viewer";
 }
 
@@ -100,7 +108,7 @@ export default function AuthProvider({ children }) {
                 const tokenRes = await getIdTokenResult(fbUser);
                 setClaims(tokenRes?.claims || null);
 
-                // Create/patch profile on first login, then read role
+                // Create/patch profile on first login (and enforce dev super_admin), then read role
                 await ensureUserProfile(fbUser);
                 const fetchedRole = await fetchUserRole(fbUser.uid);
                 setRole(fetchedRole);

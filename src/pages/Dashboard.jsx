@@ -69,7 +69,7 @@ export default function Dashboard() {
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        navigate("/login");
+        navigate("/login", { replace: true });
       } else {
         await user.reload();
         const refreshedUser = auth.currentUser;
@@ -86,7 +86,7 @@ export default function Dashboard() {
             await updateDoc(userRef, { emailVerified: refreshedUser.emailVerified });
           }
 
-          if (!refreshedUser.emailVerified) navigate("/login");
+          if (!refreshedUser.emailVerified) navigate("/login", { replace: true });
         }
       }
     });

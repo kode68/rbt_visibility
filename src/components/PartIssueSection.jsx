@@ -13,22 +13,24 @@ const ALL_PARTS = [
     "TC BELT", "TC LOAD WHEEL", "XBEE"
 ].sort();
 
-// Helper to generate default structure
+// Use the same shape as the grid: { selected, dispatch_date, delivery_date }
 const generateDefaultPartIssues = () => {
     const defaults = {};
     ALL_PARTS.forEach((part) => {
-        defaults[part] = { dispatch_date: "", delivery_date: "" };
+        defaults[part] = { selected: false, dispatch_date: "", delivery_date: "" };
     });
     return defaults;
 };
 
-const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose }) => {
+const PartIssueSection = ({ client, site, sites, rbtId, rbt, onPartIssueChange, onClose }) => {
     const [selectedParts, setSelectedParts] = useState({});
     const [showParts, setShowParts] = useState(false);
 
+    // Resolve site from props or row data
+    const resolvedSite = site || rbt?.site || (Array.isArray(sites) ? sites[0] : undefined);
     const rbtRef =
-        client && site && rbtId
-            ? doc(db, "clients", client, "sites", site, "rbts", rbtId)
+        client && resolvedSite && rbtId
+            ? doc(db, "clients", client, "sites", resolvedSite, "rbts", rbtId)
             : null;
 
     // Show parts only if conditions match
@@ -40,15 +42,16 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
         setShowParts(canShowParts);
     }, [rbt?.breakdown_status, rbt?.running_status, rbt]);
 
-    // Initialize part issues
+    // Initialize part issues, merging defaults with existing
     useEffect(() => {
         if (!rbt) return;
         const defaults = generateDefaultPartIssues();
         const existing = rbt.part_issues || {};
         const merged = {};
 
-        ALL_PARTS.forEach((part) => {
+        Object.keys(defaults).forEach((part) => {
             merged[part] = {
+                selected: Boolean(existing[part]?.selected) || false,
                 dispatch_date: existing[part]?.dispatch_date || "",
                 delivery_date: existing[part]?.delivery_date || "",
             };
@@ -58,14 +61,13 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
         if (typeof onPartIssueChange === "function") onPartIssueChange(merged);
     }, [rbt]);
 
-    if (!client || !site || !rbtId || !rbt) {
+    if (!client || !resolvedSite || !rbtId || !rbt) {
         return <p className="text-red-500 text-sm">Loading part issues...</p>;
     }
 
     // ---------- helpers ----------
     const writeAndLog = async (path, oldVal, newVal) => {
         if (!rbtRef) return;
-        // avoid redundant writes/logs
         const same =
             typeof oldVal === "object"
                 ? JSON.stringify(oldVal) === JSON.stringify(newVal)
@@ -76,7 +78,7 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
             [path]: newVal,
             last_updated: serverTimestamp(),
         });
-        await logAndUpdateField(client, site, rbtId, path, oldVal, newVal);
+        await logAndUpdateField(client, resolvedSite, rbtId, path, oldVal, newVal);
     };
 
     const setLocalAndEmit = (next) => {
@@ -84,34 +86,40 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
         if (typeof onPartIssueChange === "function") onPartIssueChange(next);
     };
 
-    // Toggle part selection (auto-save to Firestore)
-    // Selection is defined as "any date set". When toggling off, we clear both dates.
+    // Toggle part selection (now uses a real "selected" flag, aligned with the grid)
     const togglePart = async (part) => {
-        const prevObj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
-        const isSelected = !!(prevObj.dispatch_date || prevObj.delivery_date);
+        const prevObj = selectedParts[part] || { selected: false, dispatch_date: "", delivery_date: "" };
+        const nextSelected = !prevObj.selected;
 
-        const nextObj = isSelected
-            ? { dispatch_date: "", delivery_date: "" } // unselect -> clear
-            : { dispatch_date: "", delivery_date: "" }; // select -> start empty dates
+        const nextObj = {
+            selected: nextSelected,
+            dispatch_date: nextSelected ? prevObj.dispatch_date || "" : "",
+            delivery_date: nextSelected ? prevObj.delivery_date || "" : "",
+        };
 
-        // Log full object change for the part
         await writeAndLog(`part_issues.${part}`, prevObj, nextObj);
-
         const updated = { ...selectedParts, [part]: nextObj };
         setLocalAndEmit(updated);
     };
 
     // Update dispatch or delivery date
     const updateDate = async (part, field, value) => {
-        const prevObj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
+        const prevObj = selectedParts[part] || { selected: false, dispatch_date: "", delivery_date: "" };
         const prevValue = prevObj[field] || "";
         if (prevValue === value) return;
 
-        // Write specific nested field
+        // Update the field
         await writeAndLog(`part_issues.${part}.${field}`, prevValue, value);
 
-        const nextObj = { ...prevObj, [field]: value };
-        const updated = { ...selectedParts, [part]: nextObj };
+        // Auto-manage "selected": if any date is set -> selected = true; if both empty -> false
+        const temp = { ...prevObj, [field]: value };
+        const anyDate = Boolean(temp.dispatch_date || temp.delivery_date);
+        if (temp.selected !== anyDate) {
+            await writeAndLog(`part_issues.${part}.selected`, temp.selected, anyDate);
+            temp.selected = anyDate;
+        }
+
+        const updated = { ...selectedParts, [part]: temp };
         setLocalAndEmit(updated);
     };
 
@@ -127,8 +135,8 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
             <div className="flex-1 overflow-y-auto mb-4 pr-2">
                 <div className="grid grid-cols-2 gap-3">
                     {ALL_PARTS.map((part) => {
-                        const obj = selectedParts[part] || { dispatch_date: "", delivery_date: "" };
-                        const isSelected = !!(obj.dispatch_date || obj.delivery_date);
+                        const obj = selectedParts[part] || { selected: false, dispatch_date: "", delivery_date: "" };
+                        const isSelected = !!obj.selected;
 
                         return (
                             <div key={part} className="border rounded-lg p-3 bg-gray-50">
@@ -136,7 +144,7 @@ const PartIssueSection = ({ client, site, rbtId, rbt, onPartIssueChange, onClose
                                     <label className="flex items-center space-x-2 text-sm">
                                         <input
                                             type="checkbox"
-                                            checked={!!isSelected}
+                                            checked={isSelected}
                                             onChange={() => togglePart(part)}
                                             className="accent-blue-600"
                                         />

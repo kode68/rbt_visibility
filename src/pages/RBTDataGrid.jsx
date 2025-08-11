@@ -256,7 +256,6 @@ const RBTDataGrid = ({ client, sites }) => {
     };
 
     // ========= STATUS CHANGE ORCHESTRATION =========
-
     const openIssueDialogFor = (row, pending) => {
         setSelectedRBT(row);
         setPartIssues(row.part_issues || generateDefaultPartIssues());
@@ -300,7 +299,7 @@ const RBTDataGrid = ({ client, sites }) => {
         await updateFieldWithLog(row, field, newValue);
     };
 
-    // ✅ DROPDOWN: render in a portal so it never gets clipped; comfy size
+    // ✅ dropdown renderer
     const renderDropdown = (params, field, options) => (
         <FormControl size="small" sx={{ minWidth: 140, width: "100%" }}>
             <Select
@@ -308,13 +307,6 @@ const RBTDataGrid = ({ client, sites }) => {
                 onChange={async (e) => {
                     const newValue = e.target.value;
                     await beginStatusChange(params.row, field, newValue);
-
-                    if (
-                        (field === "running_status" && (newValue === "Manual" || newValue === "Not Running")) ||
-                        (field === "breakdown_status" && (newValue === "Breakdown" || newValue === "Running With Issue"))
-                    ) {
-                        // opening dialog already handled in beginStatusChange
-                    }
                 }}
                 displayEmpty
                 fullWidth
@@ -346,7 +338,6 @@ const RBTDataGrid = ({ client, sites }) => {
     );
 
     const openPartIssues = (row) => {
-        // Manual open (no status pending). Let them edit parts/target_date optionally.
         setSelectedRBT(row);
         setPartIssues(row.part_issues || generateDefaultPartIssues());
         setTargetDate(row.target_date || "");
@@ -355,6 +346,17 @@ const RBTDataGrid = ({ client, sites }) => {
 
     const getSelectedPartCount = (row) =>
         Object.values(row.part_issues || {}).filter((p) => p?.selected).length;
+
+    // ====== Delete RBT (Super Admin only) — hoisted so columns can use it ======
+    async function handleDeleteRBT(rbt) {
+        if (userRole !== "super_admin") {
+            alert("Only Super Admin can delete RBTs.");
+            return;
+        }
+        if (!window.confirm(`Are you sure you want to delete ${rbt.id}?`)) return;
+        await deleteDoc(doc(db, "clients", client, "sites", rbt.site, "rbts", rbt.id));
+        setRows((prev) => prev.filter((row) => !(row.id === rbt.id && row.site === rbt.site)));
+    }
 
     // ====== Columns ======
     const baseEditable = userRole === "super_admin";
@@ -406,7 +408,6 @@ const RBTDataGrid = ({ client, sites }) => {
                 ]);
             },
         },
-        // Target Date (read-only in grid for cleanliness)
         {
             field: "target_date",
             headerName: "Target Date",
@@ -418,7 +419,6 @@ const RBTDataGrid = ({ client, sites }) => {
             renderCell: (params) => {
                 const value = params.row.target_date || "";
                 if (!value) return <span style={{ opacity: 0.45 }}>—</span>;
-                // show as dd-MMM-yyyy
                 let label = value;
                 try { label = format(new Date(value), "dd-MMM-yyyy"); } catch { }
                 return (
@@ -432,7 +432,6 @@ const RBTDataGrid = ({ client, sites }) => {
                 );
             },
         },
-        // Ageing (computed) — handle both v5/v6 signatures
         {
             field: "ageing",
             headerName: "Ageing",
@@ -504,17 +503,6 @@ const RBTDataGrid = ({ client, sites }) => {
             : []),
     ];
 
-    // ✅ Delete RBT (Super Admin only)
-    const handleDeleteRBT = async (rbt) => {
-        if (userRole !== "super_admin") {
-            alert("Only Super Admin can delete RBTs.");
-            return;
-        }
-        if (!window.confirm(`Are you sure you want to delete ${rbt.id}?`)) return;
-        await deleteDoc(doc(db, "clients", client, "sites", rbt.site, "rbts", rbt.id));
-        setRows((prev) => prev.filter((row) => !(row.id === rbt.id && row.site === rbt.site)));
-    };
-
     // Handle inline edits (super admin) for base text fields
     const makeEditCommitHandler = (site) => async (params) => {
         const row = rows.find((r) => r.site === site && r.id === params.id);
@@ -558,18 +546,15 @@ const RBTDataGrid = ({ client, sites }) => {
                         loading={loading}
                         rows={rows.filter((r) => r.site === site)}
                         columns={columns}
-                        components={{ Toolbar: GridToolbar, LoadingOverlay: LinearProgress }}
-                        componentsProps={{
-                            toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } },
-                        }}
+                        slots={{ toolbar: GridToolbar, loadingOverlay: LinearProgress }}
+                        slotProps={{ toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 300 } } }}
                         getRowClassName={(params) => (getSelectedPartCount(params.row) > 0 ? "row-has-issues" : "")}
                         onCellEditCommit={makeEditCommitHandler(site)}
                         initialState={{
                             pagination: { paginationModel: { pageSize: 25 } },
                         }}
                         pageSizeOptions={[10, 25, 50]}
-                        disableColumnMenu
-                        disableSelectionOnClick
+                        disableRowSelectionOnClick
                         sx={{
                             borderRadius: 2,
                             border: "1px solid #e6e9ef",

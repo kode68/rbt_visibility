@@ -1,9 +1,7 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from "react-router-dom";
+import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useAuthState } from "react-firebase-hooks/auth";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Logs from "./pages/Logs";
 import { auth } from "./firebase";
@@ -12,18 +10,42 @@ import OverallDashboard from "./pages/OverallDashboard";
 
 export default function App() {
   return (
-    <Router>
+    <>
       <Routes>
-        <Route path="/" element={<Welcome />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* App root → dashboard (public routes handled in index.jsx) */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/logs" element={<AdminOnly><Logs /></AdminOnly>} />
-        <Route path="/manage-users" element={<ManageUsers />} />
-        <Route path="/overall-dashboard" element={<OverallDashboard />} />
+
+        {/* Admin-only */}
+        <Route
+          path="/logs"
+          element={
+            <AdminOnly>
+              <Logs />
+            </AdminOnly>
+          }
+        />
+
+        {/* Super-admin only */}
+        <Route
+          path="/manage-users"
+          element={
+            <SuperAdminOnly>
+              <ManageUsers />
+            </SuperAdminOnly>
+          }
+        />
+        <Route
+          path="/overall-dashboard"
+          element={
+            <SuperAdminOnly>
+              <OverallDashboard />
+            </SuperAdminOnly>
+          }
+        />
       </Routes>
       <Toaster position="top-center" />
-    </Router>
+    </>
   );
 }
 
@@ -38,7 +60,9 @@ function Welcome() {
           alt="BrightBots Logo"
           className="h-20 mx-auto mb-4"
         />
-        <h1 className="text-2xl font-bold mb-4 text-gray-800">Welcome to BrightBots RBT Dashboard</h1>
+        <h1 className="text-2xl font-bold mb-4 text-gray-800">
+          Welcome to BrightBots RBT Dashboard
+        </h1>
         <p className="text-gray-600 mb-6">Manage all your site robots in one place.</p>
         <button
           onClick={() => navigate("/login")}
@@ -47,7 +71,7 @@ function Welcome() {
           Login
         </button>
         <p className="mt-4 text-sm text-gray-500">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <span
             onClick={() => navigate("/signup")}
             className="text-blue-600 cursor-pointer hover:underline"
@@ -60,17 +84,25 @@ function Welcome() {
   );
 }
 
-// ✅ Admin-only wrapper using inline logic
+// ✅ Admin-only wrapper
 function AdminOnly({ children }) {
   const [user, loading] = useAuthState(auth);
-
   if (loading) return null;
 
   const isAdmin = user?.email?.endsWith("@brightbots.in");
-
   if (!user || !user.emailVerified || !isAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
+  return children;
+}
 
+// 🔒 Super-admin-only wrapper
+function SuperAdminOnly({ children }) {
+  const [user, loading] = useAuthState(auth);
+  if (loading) return null;
+  const isSuperAdmin = user?.email === "dev@brightbots.in";
+  if (!user || !user.emailVerified || !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return children;
 }

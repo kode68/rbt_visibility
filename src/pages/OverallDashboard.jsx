@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { collection, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { format, differenceInDays } from "date-fns";
-import Chart from "chart.js/auto";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useNavigate } from "react-router-dom";
 
 const OverallDashboard = () => {
     const [clients, setClients] = useState([]);
@@ -20,19 +21,20 @@ const OverallDashboard = () => {
         to: "",
     });
 
-    const chartRef = useRef(null);
+    const [user, authLoading] = useAuthState(auth);
+    const navigate = useNavigate();
 
     const runningStatusOptions = [
         { value: "Auto", label: "Auto" },
         { value: "Manual", label: "Manual" },
         { value: "Not Running", label: "Not Running" },
-        { value: "N/A", label: "N/A" }
+        { value: "N/A", label: "N/A" },
     ];
 
     const breakdownStatusOptions = [
         { value: "Breakdown", label: "Breakdown" },
         { value: "Running With Issue", label: "Running With Issue" },
-        { value: "N/A", label: "N/A" }
+        { value: "N/A", label: "N/A" },
     ];
 
     const workOptions = [
@@ -40,27 +42,29 @@ const OverallDashboard = () => {
         { value: "Part Testing", label: "Part Testing" },
         { value: "Trial", label: "Trial" },
         { value: "Auto Scheduling", label: "Auto Scheduling" },
-        { value: "N/A", label: "N/A" }
+        { value: "N/A", label: "N/A" },
     ];
 
-    // ✅ Fetch user role
+    // 🔒 Super-admin gate
     useEffect(() => {
-        const fetchRole = () => {
-            const user = auth.currentUser;
-            if (!user || !user.email) return;
-            if (user.email === "dev@brightbots.in") setUserRole("super_admin");
-            else if (user.email.endsWith("@brightbots.in")) setUserRole("admin");
-            else setUserRole("user");
-        };
-        fetchRole();
-    }, []);
+        if (authLoading) return;
+        if (!user) {
+            navigate("/login", { replace: true });
+            return;
+        }
+        if (user.email !== "dev@brightbots.in") {
+            navigate("/dashboard", { replace: true });
+            return;
+        }
+        setUserRole("super_admin");
+    }, [user, authLoading, navigate]);
 
     // ✅ Fetch all clients
     useEffect(() => {
         const fetchClients = async () => {
             try {
                 const snapshot = await getDocs(collection(db, "clients"));
-                setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setClients(snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
             } catch (err) {
                 console.error("Error fetching clients:", err);
             }
@@ -81,9 +85,11 @@ const OverallDashboard = () => {
 
                 for (const siteDoc of sitesSnapshot.docs) {
                     const siteName = siteDoc.id;
-                    const rbtsSnapshot = await getDocs(collection(db, "clients", selectedClient, "sites", siteName, "rbts"));
+                    const rbtsSnapshot = await getDocs(
+                        collection(db, "clients", selectedClient, "sites", siteName, "rbts")
+                    );
 
-                    const siteRbts = rbtsSnapshot.docs.map(docItem => {
+                    const siteRbts = rbtsSnapshot.docs.map((docItem) => {
                         const rbt = docItem.data() || {};
                         const lastUpdated = rbt?.last_updated?.toDate?.() || null;
                         return {
@@ -100,7 +106,7 @@ const OverallDashboard = () => {
                                     ? 0
                                     : lastUpdated
                                         ? Math.max(differenceInDays(new Date(), lastUpdated), 0)
-                                        : "-"
+                                        : "-",
                         };
                     });
 
@@ -127,65 +133,40 @@ const OverallDashboard = () => {
         let result = [...rbts];
 
         if (filters.site) result = result.filter((rbt) => rbt.site === filters.site);
-        if (filters.running_status) result = result.filter((rbt) => rbt.running_status === filters.running_status);
-        if (filters.breakdown_status) result = result.filter((rbt) => rbt.breakdown_status === filters.breakdown_status);
+        if (filters.running_status)
+            result = result.filter((rbt) => rbt.running_status === filters.running_status);
+        if (filters.breakdown_status)
+            result = result.filter((rbt) => rbt.breakdown_status === filters.breakdown_status);
         if (filters.work) result = result.filter((rbt) => rbt.work === filters.work);
 
         if (filters.from) {
             const fromDate = new Date(filters.from);
-            if (!isNaN(fromDate)) result = result.filter((rbt) => rbt.last_updated && rbt.last_updated >= fromDate);
+            if (!isNaN(fromDate))
+                result = result.filter((rbt) => rbt.last_updated && rbt.last_updated >= fromDate);
         }
 
         if (filters.to) {
             const toDate = new Date(filters.to);
-            if (!isNaN(toDate)) result = result.filter((rbt) => rbt.last_updated && rbt.last_updated <= toDate);
+            if (!isNaN(toDate))
+                result = result.filter((rbt) => rbt.last_updated && rbt.last_updated <= toDate);
         }
 
         setFiltered(result);
     }, [filters, rbts]);
 
-    // ✅ Chart updates
-    useEffect(() => {
-        const ctx = document.getElementById("statusChart");
-        if (!ctx) return;
-
-        if (chartRef.current) chartRef.current.destroy();
-
-        const counts = { Auto: 0, Manual: 0, "Not Running": 0 };
-        filtered.forEach((rbt) => {
-            if (counts.hasOwnProperty(rbt.running_status)) counts[rbt.running_status]++;
-        });
-
-        chartRef.current = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: Object.keys(counts),
-                datasets: [
-                    {
-                        label: "Running Status",
-                        data: Object.values(counts),
-                        borderColor: "#2563eb",
-                        backgroundColor: "rgba(37, 99, 235, 0.3)",
-                        tension: 0.4,
-                        fill: true,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                plugins: { tooltip: { enabled: true }, legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, title: { display: true, text: "No. of RBTs" } },
-                    x: { title: { display: true, text: "Running Status" } },
-                },
-            },
-        });
-    }, [filtered]);
-
-    const handleFilterChange = (e) => setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const handleFilterChange = (e) =>
+        setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
     const handleExportCSV = () => {
-        const headers = ["Site", "RBT", "Running Status", "Breakdown Status", "Work", "Ageing", "Last Updated"];
+        const headers = [
+            "Site",
+            "RBT",
+            "Running Status",
+            "Breakdown Status",
+            "Work",
+            "Ageing",
+            "Last Updated",
+        ];
         const rows = filtered.map((rbt) => [
             rbt.site,
             rbt.rbt_id,
@@ -197,7 +178,9 @@ const OverallDashboard = () => {
         ]);
 
         const escapeCSV = (val) => `"${String(val || "").replace(/"/g, '""')}"`;
-        const csvContent = [headers, ...rows].map((row) => row.map(escapeCSV).join(",")).join("\n");
+        const csvContent = [headers, ...rows]
+            .map((row) => row.map(escapeCSV).join(","))
+            .join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
 
@@ -229,7 +212,8 @@ const OverallDashboard = () => {
                             ...r,
                             ...updateData,
                             last_updated: now,
-                            running_status_ageing: field === "running_status" ? (value === "Auto" ? 0 : 0) : r.running_status_ageing,
+                            running_status_ageing:
+                                field === "running_status" ? (value === "Auto" ? 0 : 0) : r.running_status_ageing,
                         }
                         : r
                 )
@@ -250,10 +234,16 @@ const OverallDashboard = () => {
 
             {/* CLIENT SELECTOR */}
             <div className="mb-4">
-                <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="border p-2 rounded-md">
+                <select
+                    value={selectedClient}
+                    onChange={(e) => setSelectedClient(e.target.value)}
+                    className="border p-2 rounded-md"
+                >
                     <option value="">Select Client</option>
                     {clients.map((client) => (
-                        <option key={client.id} value={client.id}>{client.id}</option>
+                        <option key={client.id} value={client.id}>
+                            {client.id}
+                        </option>
                     ))}
                 </select>
             </div>
@@ -280,50 +270,88 @@ const OverallDashboard = () => {
 
             {/* FILTERS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <select name="site" value={filters.site} onChange={handleFilterChange} className="border p-2 rounded-md">
+                <select
+                    name="site"
+                    value={filters.site}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                >
                     <option value="">Filter by Site</option>
                     {Array.from(new Set(rbts.map((rbt) => rbt.site)))
                         .filter((v) => v)
                         .map((val) => (
-                            <option key={val} value={val}>{val}</option>
+                            <option key={val} value={val}>
+                                {val}
+                            </option>
                         ))}
                 </select>
 
-                <select name="running_status" value={filters.running_status} onChange={handleFilterChange} className="border p-2 rounded-md">
+                <select
+                    name="running_status"
+                    value={filters.running_status}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                >
                     <option value="">Filter by Running Status</option>
                     {runningStatusOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
                     ))}
                 </select>
 
-                <select name="breakdown_status" value={filters.breakdown_status} onChange={handleFilterChange} className="border p-2 rounded-md">
+                <select
+                    name="breakdown_status"
+                    value={filters.breakdown_status}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                >
                     <option value="">Filter by Breakdown Status</option>
                     {breakdownStatusOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
                     ))}
                 </select>
 
-                <select name="work" value={filters.work} onChange={handleFilterChange} className="border p-2 rounded-md">
+                <select
+                    name="work"
+                    value={filters.work}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                >
                     <option value="">Filter by Work</option>
                     {workOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
                     ))}
                 </select>
 
-                <input type="date" name="from" value={filters.from} onChange={handleFilterChange} className="border p-2 rounded-md" />
-                <input type="date" name="to" value={filters.to} onChange={handleFilterChange} className="border p-2 rounded-md" />
+                <input
+                    type="date"
+                    name="from"
+                    value={filters.from}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                />
+                <input
+                    type="date"
+                    name="to"
+                    value={filters.to}
+                    onChange={handleFilterChange}
+                    className="border p-2 rounded-md"
+                />
             </div>
 
             {/* EXPORT */}
             <div className="mb-4">
-                <button onClick={handleExportCSV} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                <button
+                    onClick={handleExportCSV}
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
                     Export CSV
                 </button>
-            </div>
-
-            {/* CHART */}
-            <div className="w-2/4 mx-auto mb-10 transition-transform duration-300 hover:scale-110">
-                <canvas id="statusChart" height="200"></canvas>
             </div>
 
             {/* TABLE */}
@@ -353,15 +381,29 @@ const OverallDashboard = () => {
                                             {userRole === "admin" || userRole === "super_admin" ? (
                                                 <select
                                                     value={rbt[field] || "N/A"}
-                                                    onChange={(e) => handleEditField(rbt.id, rbt.site, field, e.target.value)}
+                                                    onChange={(e) =>
+                                                        handleEditField(rbt.id, rbt.site, field, e.target.value)
+                                                    }
                                                     className="border p-1 rounded"
                                                 >
                                                     {field === "running_status" &&
-                                                        runningStatusOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                        runningStatusOptions.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
                                                     {field === "breakdown_status" &&
-                                                        breakdownStatusOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                        breakdownStatusOptions.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
                                                     {field === "work" &&
-                                                        workOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                        workOptions.map((opt) => (
+                                                            <option key={opt.value} value={opt.value}>
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
                                                 </select>
                                             ) : (
                                                 rbt[field] || "N/A"
@@ -369,7 +411,9 @@ const OverallDashboard = () => {
                                         </td>
                                     ))}
                                     <td className="py-2 px-4 text-center">{rbt.running_status_ageing}</td>
-                                    <td className="py-2 px-4">{rbt.last_updated ? format(rbt.last_updated, "yyyy-MM-dd HH:mm") : "-"}</td>
+                                    <td className="py-2 px-4">
+                                        {rbt.last_updated ? format(rbt.last_updated, "yyyy-MM-dd HH:mm") : "-"}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
