@@ -1,0 +1,27 @@
+﻿{
+    "indexes": [
+        {
+            "collectionGroup": "rbts",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "client",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "site",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "running_status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "updatedAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

@@ -11,6 +11,11 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Detect if we're using local emulators (set in firebase.js)
+  const usingEmulators = Boolean(
+    typeof window !== "undefined" && window.__FIREBASE__ && window.__FIREBASE__.useEmulators
+  );
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setErr("");
@@ -20,34 +25,33 @@ function Login() {
       const userCred = await signInWithEmailAndPassword(auth, email, password);
       const user = userCred.user;
 
-      if (!user.emailVerified) {
+      // In production, require verified email. In emulator/local, skip this check.
+      if (!usingEmulators && !user.emailVerified) {
         setErr("Please verify your email before logging in.");
         setLoading(false);
         return;
       }
 
-      // Use email as document ID to prevent duplicates
-      const userRef = doc(db, "users", user.email);
+      // Use UID as document ID (stable, avoids duplicates)
+      const userRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(userRef);
 
       if (!docSnap.exists()) {
-        // Assign roles properly
-        const role = user.email === "dev@brightbots.in" ? "super_admin" : "user";
-
+        const role = user.email === "dev@brightbots.in" ? "super_admin" : "viewer";
         await setDoc(userRef, {
           email: user.email,
           emailVerified: user.emailVerified,
           role,
         });
       } else {
-        // Update emailVerified if changed
+        // Keep emailVerified in sync
         await setDoc(
           userRef,
-          { emailVerified: user.emailVerified },
+          { emailVerified: user.emailVerified, email: user.email },
           { merge: true }
         );
 
-        // Ensure role for dev@brightbots.in is always super_admin
+        // Ensure dev@brightbots.in is always super_admin
         if (user.email === "dev@brightbots.in") {
           await setDoc(userRef, { role: "super_admin" }, { merge: true });
         }
