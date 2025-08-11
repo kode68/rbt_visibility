@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "brightbots-rbt",
     "public": "build",
     "ignore": [
       "firebase.json",
@@ -26,7 +27,7 @@
         ]
       },
       {
-        "source": "**/*.{png,jpg,jpeg,gif,webp,svg,ico,woff,woff2,ttf}",
+        "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -83,9 +84,6 @@
         "source": "**",
         "destination": "/index.html"
       }
-    ],
-    "predeploy": [
-      "npm run build"
     ]
   },
   "firestore": {

@@ -4,10 +4,10 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
-import ProtectedRoute from "./components/ProtectedRoute";
+import AuthProvider, { useAuth, ProtectedRoute } from "./auth/AuthProvider";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup"; // 👈 add this
 
-// --- Simple loading + error UI ---
 function LoadingScreen() {
     return (
         <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -40,7 +40,6 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-// Minimal 403 page
 function Forbidden() {
     return (
         <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -51,18 +50,21 @@ function Forbidden() {
     );
 }
 
-function AppRoutes() {
-    // ProtectedRoute already shows a loading state via react-firebase-hooks
+function RouterWithAuthGate() {
+    const { loading } = useAuth();
+    if (loading) return <LoadingScreen />;
+
     return (
         <Routes>
-            {/* Public */}
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} /> {/* 👈 add this */}
 
-            {/* Protected: your main app */}
+            {/* Protected app (any logged-in role) */}
             <Route
                 path="/*"
                 element={
-                    <ProtectedRoute>
+                    <ProtectedRoute roles={["viewer", "admin", "super_admin"]}>
                         <App />
                     </ProtectedRoute>
                 }
@@ -70,18 +72,19 @@ function AppRoutes() {
 
             {/* Forbidden + fallback */}
             <Route path="/403" element={<Forbidden />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
+ReactDOM.createRoot(document.getElementById("root")).render(
     <React.StrictMode>
         <ErrorBoundary>
-            <BrowserRouter>
-                <AppRoutes />
-            </BrowserRouter>
+            <AuthProvider>
+                <BrowserRouter>
+                    <RouterWithAuthGate />
+                </BrowserRouter>
+            </AuthProvider>
         </ErrorBoundary>
     </React.StrictMode>
 );

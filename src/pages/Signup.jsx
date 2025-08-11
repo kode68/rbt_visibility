@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { auth, db } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { doc, setDoc } from "firebase/firestore";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -12,6 +12,14 @@ export default function Signup() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // If already signed in, go straight to dashboard
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => {
+      if (u) navigate("/dashboard", { replace: true });
+    });
+    return unsub;
+  }, [navigate]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -29,15 +37,16 @@ export default function Signup() {
       const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCred.user;
 
-      // Store user info in Firestore (merge avoids overwriting on retries)
+      // Create/merge basic profile (role is managed by admins later)
       await setDoc(
         doc(db, "users", user.uid),
         {
           email: user.email,
           firstName,
           lastName,
-          role: "viewer",
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
         },
         { merge: true }
       );
@@ -49,6 +58,8 @@ export default function Signup() {
       let message = error?.message || "Failed to create account.";
       if (error?.code === "auth/email-already-in-use") message = "This email is already registered.";
       if (error?.code === "auth/weak-password") message = "Password is too weak. Try a stronger one.";
+      if (error?.code === "permission-denied")
+        message = "Permission denied creating user profile. Ask an admin to review Firestore rules.";
       setErr(message);
     } finally {
       setLoading(false);
@@ -57,12 +68,24 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 to-blue-200 relative overflow-hidden px-4">
-      {/* Floating Logo */}
-      <img
-        src="https://brightbots.in/img/Brightbots-logo.png"
-        alt="BrightBots Logo"
-        className="absolute top-6 left-6 h-12 drop-shadow-lg transition-transform duration-300 hover:scale-105"
-      />
+      {/* Brand chip (same as Login) */}
+      <a
+        href="/"
+        className="absolute top-4 left-4 inline-flex items-center gap-2 bg-white/90 rounded-lg shadow-md px-2 py-1"
+        aria-label="BrightBots Home"
+      >
+        <img
+          src="https://brightbots.in/img/Brightbots-logo.png"
+          alt="BrightBots Logo"
+          width={56}
+          height={56}
+          loading="eager"
+          className="h-12 w-12 object-contain"
+        />
+        <span className="hidden sm:inline text-sm font-semibold text-blue-900 tracking-wide">
+          BrightBots
+        </span>
+      </a>
 
       {/* Glow Effects */}
       <div className="absolute w-72 h-72 bg-purple-300 rounded-full opacity-30 blur-3xl top-0 -left-20 animate-pulse"></div>
@@ -83,6 +106,8 @@ export default function Signup() {
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="John"
               required
+              autoComplete="given-name"
+              autoFocus
               className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
             />
           </div>
@@ -95,6 +120,7 @@ export default function Signup() {
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Doe"
               required
+              autoComplete="family-name"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
             />
           </div>
@@ -110,6 +136,7 @@ export default function Signup() {
               placeholder="you@brightbots.in"
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
             />
           </div>
@@ -125,12 +152,13 @@ export default function Signup() {
               placeholder="••••••••"
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="new-password"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
             />
           </div>
 
           {err && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative text-sm animate-fade-in">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative text-sm animate-fade-in" role="alert">
               {err}
             </div>
           )}

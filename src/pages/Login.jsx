@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { useNavigate, Link } from "react-router-dom";
@@ -11,9 +11,17 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Use the same flag as firebase.js
+  // Match firebase.js flag
   const usingEmulators =
     String(process.env.REACT_APP_USE_FIREBASE_EMULATORS || "false").toLowerCase() === "true";
+
+  // If already signed in, bounce to dashboard
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => {
+      if (u) navigate("/dashboard", { replace: true });
+    });
+    return unsub;
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -24,44 +32,36 @@ function Login() {
       const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCred.user;
 
-      // In production, require verified email. In emulator/local, skip this check.
+      // In production, require verified email
       if (!usingEmulators && !user.emailVerified) {
         setErr("Please verify your email before logging in.");
         setLoading(false);
         return;
       }
 
-      // Use UID as document ID (stable, avoids duplicates)
+      // Create or patch users/{uid} WITHOUT role (rules restrict setting role on create)
       const userRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(userRef);
+      const snap = await getDoc(userRef);
 
-      if (!docSnap.exists()) {
-        const role = user.email === "dev@brightbots.in" ? "super_admin" : "viewer";
-        await setDoc(userRef, {
-          email: user.email,
-          emailVerified: user.emailVerified,
-          role,
-        });
-      } else {
-        // Keep emailVerified in sync
+      if (!snap.exists()) {
         await setDoc(
           userRef,
-          { emailVerified: user.emailVerified, email: user.email },
+          { email: user.email, emailVerified: user.emailVerified },
           { merge: true }
         );
-
-        // Ensure dev@brightbots.in is always super_admin
-        if (user.email === "dev@brightbots.in") {
-          await setDoc(userRef, { role: "super_admin" }, { merge: true });
-        }
+      } else {
+        await setDoc(
+          userRef,
+          { email: user.email, emailVerified: user.emailVerified },
+          { merge: true }
+        );
       }
 
       navigate("/dashboard");
     } catch (error) {
       let message = error?.message || "Login failed";
-      if (error?.code === "auth/invalid-credential") {
-        message = "Invalid email or password.";
-      }
+      if (error?.code === "auth/invalid-credential") message = "Invalid email or password.";
+      if (error?.code === "auth/too-many-requests") message = "Too many attempts. Please try again later.";
       setErr("Login failed: " + message);
       setLoading(false);
     }
@@ -69,12 +69,24 @@ function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200 relative overflow-hidden px-4">
-      {/* Floating Logo */}
-      <img
-        src="https://brightbots.in/img/Brightbots-logo.png"
-        alt="BrightBots Logo"
-        className="absolute top-6 left-6 h-12 drop-shadow-lg transition-transform duration-300 hover:scale-105"
-      />
+      {/* Brand logo (visible on light background) */}
+      <a
+        href="/"
+        className="absolute top-4 left-4 inline-flex items-center gap-2 bg-white/90 rounded-lg shadow-md px-2 py-1"
+        aria-label="BrightBots Home"
+      >
+        <img
+          src="https://brightbots.in/img/Brightbots-logo.png"
+          alt="BrightBots Logo"
+          width={56}
+          height={56}
+          loading="eager"
+          className="h-12 w-12 object-contain"
+        />
+        <span className="hidden sm:inline text-sm font-semibold text-blue-900 tracking-wide">
+          BrightBots
+        </span>
+      </a>
 
       {/* Glow Effects */}
       <div className="absolute w-72 h-72 bg-blue-300 rounded-full opacity-30 blur-3xl top-0 -left-20 animate-pulse"></div>
@@ -96,6 +108,7 @@ function Login() {
               id="email"
               type="email"
               value={email}
+              autoComplete="email"
               placeholder="you@brightbots.in"
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -111,6 +124,7 @@ function Login() {
               id="password"
               type="password"
               value={password}
+              autoComplete="current-password"
               placeholder="••••••••"
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -119,7 +133,11 @@ function Login() {
           </div>
 
           {err && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative text-sm animate-fade-in">
+            <div
+              className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative text-sm animate-fade-in"
+              role="alert"
+              aria-live="polite"
+            >
               {err}
             </div>
           )}

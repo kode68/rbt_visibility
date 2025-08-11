@@ -1,0 +1,203 @@
+[debug] [2025-08-11T19:12:07.815Z] ----------------------------------------------------------------------
+[debug] [2025-08-11T19:12:07.817Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\mis\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting --debug
+[debug] [2025-08-11T19:12:07.818Z] CLI Version:   14.12.0
+[debug] [2025-08-11T19:12:07.818Z] Platform:      win32
+[debug] [2025-08-11T19:12:07.818Z] Node Version:  v22.17.1
+[debug] [2025-08-11T19:12:07.818Z] Time:          Tue Aug 12 2025 00:42:07 GMT+0530 (India Standard Time)
+[debug] [2025-08-11T19:12:07.818Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-11T19:12:07.994Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-11T19:12:07.995Z] > authorizing via signed-in user (dev@brightbots.in)
+[debug] [2025-08-11T19:12:07.996Z] [iam] checking project rbt-app-a30e8 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-08-11T19:12:07.997Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:07.997Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:07.998Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/rbt-app-a30e8:testIamPermissions [none]
+[debug] [2025-08-11T19:12:07.999Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/rbt-app-a30e8:testIamPermissions x-goog-quota-user=projects/rbt-app-a30e8
+[debug] [2025-08-11T19:12:07.999Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rbt-app-a30e8:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-08-11T19:12:09.496Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/rbt-app-a30e8:testIamPermissions 200
+[debug] [2025-08-11T19:12:09.499Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rbt-app-a30e8:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-08-11T19:12:09.500Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:09.501Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:09.501Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/rbt-app-a30e8 [none]
+[debug] [2025-08-11T19:12:10.129Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/rbt-app-a30e8 200
+[debug] [2025-08-11T19:12:10.129Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/rbt-app-a30e8 {"projectId":"rbt-app-a30e8","projectNumber":"156822646831","displayName":"rbt-app","name":"projects/rbt-app-a30e8","resources":{"hostingSite":"rbt-app-a30e8","realtimeDatabaseInstance":"rbt-app-a30e8-default-rtdb"},"state":"ACTIVE","etag":"1_444eb00c-1d16-4e64-90e6-c75c919b06a6"}
+[info] 
+[info] === Deploying to 'rbt-app-a30e8'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2025-08-11T19:12:10.135Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:10.136Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:10.137Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions [none]
+[debug] [2025-08-11T19:12:10.137Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-08-11T19:12:11.646Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions 200
+[debug] [2025-08-11T19:12:11.647Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions {"name":"projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[info] i  hosting[brightbots-rbt]: beginning deploy... 
+[info] i  hosting[brightbots-rbt]: found 12 files in build 
+[debug] [2025-08-11T19:12:11.658Z] [hosting] uploading with 200 concurrency
+[debug] [2025-08-11T19:12:11.659Z] [hosting] hash cache [YnVpbGQ] not populated
+[debug] [2025-08-11T19:12:12.183Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.183Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.185Z] [hosting] hash cache [YnVpbGQ] stored for 12 files
+[debug] [2025-08-11T19:12:12.185Z] [hosting][hash queue][FINAL] {"max":521,"min":8,"avg":56,"active":0,"complete":12,"success":12,"errored":0,"retried":0,"total":12,"elapsed":525}
+[debug] [2025-08-11T19:12:12.185Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199:populateFiles [none]
+[debug] [2025-08-11T19:12:12.186Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199:populateFiles {"files":{"/robots.txt":"b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5","/manifest.json":"4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10","/index.html":"5728c386c2d7bd9ab71a68fbf91b219bed003c0d1c41be4b3adf5818653a86f1","/asset-manifest.json":"d71dbb065e5e995b020b0eee6c0bf5e9938ba9f092f4b2ec8aa703f37da8e0f7","/static/js/main.14ebc98b.js.LICENSE.txt":"e4b48dd5b8c1bafce14edb9b0af24f515e77b67d2894d84f924d86ec66786652","/static/css/main.607f710c.css.map":"967899d298029d5de0aa1bc0e13aaf3ef5862579fccc57d09b395760c6e27908","/static/css/main.607f710c.css":"2200cc6cf0b911a6d519b4babf72dd226d916778c925bb657ccb0690a857e53b","/logo192.png":"79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0","/logo512.png":"212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d","/favicon.ico":"27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d","/static/js/main.14ebc98b.js":"8fdce1ba55d91db89029670b8e1519bfff48d279ee66dcb406c9edd2218275af","/static/js/main.14ebc98b.js.map":"db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff"}}
+[debug] [2025-08-11T19:12:12.712Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199:populateFiles 200
+[debug] [2025-08-11T19:12:12.713Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199:populateFiles {"uploadRequiredHashes":["79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0","27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d","db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff","b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5","4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10","212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d"],"uploadUrl":"https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files"}
+[debug] [2025-08-11T19:12:12.714Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.714Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.714Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.714Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.715Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.715Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.716Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.716Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.716Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.716Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.716Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.717Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:12.717Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [none]
+[debug] [2025-08-11T19:12:12.717Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [stream]
+[debug] [2025-08-11T19:12:12.719Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [none]
+[debug] [2025-08-11T19:12:12.720Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [stream]
+[debug] [2025-08-11T19:12:12.721Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff [none]
+[debug] [2025-08-11T19:12:12.721Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff [stream]
+[debug] [2025-08-11T19:12:12.723Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5 [none]
+[debug] [2025-08-11T19:12:12.725Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5 [stream]
+[debug] [2025-08-11T19:12:12.726Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10 [none]
+[debug] [2025-08-11T19:12:12.727Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10 [stream]
+[debug] [2025-08-11T19:12:12.728Z] >>> [apiv2][query] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [none]
+[debug] [2025-08-11T19:12:12.728Z] >>> [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [stream]
+[debug] [2025-08-11T19:12:12.729Z] [hosting][populate queue][FINAL] {"max":534,"min":534,"avg":534,"active":0,"complete":1,"success":1,"errored":0,"retried":0,"total":1,"elapsed":547}
+[debug] [2025-08-11T19:12:12.730Z] [hosting] uploads queued: 6
+[info] i  hosting: uploading new files [0/6] (0%) 
+[debug] [2025-08-11T19:12:13.800Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5 200
+[debug] [2025-08-11T19:12:13.800Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/b2090cf9761ef60aa06e4fab97679bd43dfa5e5df073701ead5879d7c68f1ec5 [stream]
+[debug] [2025-08-11T19:12:13.904Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10 200
+[debug] [2025-08-11T19:12:13.904Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/4368aeaf848ae2e048765562c289452f33ad2a175c4b1951ea8bdf2ada0d5b10 [stream]
+[debug] [2025-08-11T19:12:13.967Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d 200
+[debug] [2025-08-11T19:12:13.967Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/212b102aa09e51b3b3e06647e81f7801a61333e171f6582e8124379aabccb41d [stream]
+[debug] [2025-08-11T19:12:14.036Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d 200
+[debug] [2025-08-11T19:12:14.036Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/27edce7be5922cf0bef7d4136f69b5bfbdd5bf8c13c7b026f71187d41a00aa7d [stream]
+[debug] [2025-08-11T19:12:14.448Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 200
+[debug] [2025-08-11T19:12:14.448Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/79e2b749561016bc8af300ea19f48347ceed3cb1a54f48ae456172eca45e08f0 [stream]
+[debug] [2025-08-11T19:12:14.570Z] <<< [apiv2][status] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff 200
+[debug] [2025-08-11T19:12:14.570Z] <<< [apiv2][body] POST https://upload-firebasehosting.googleapis.com/upload/sites/brightbots-rbt/versions/6595a610cf830199/files/db25401296f53b3a5a838012e84c8bf664fdbabba53652d0a7afcca68a49f2ff [stream]
+[debug] [2025-08-11T19:12:14.570Z] [hosting][upload queue][FINAL] {"max":1855,"min":1085,"avg":1406.1666666666667,"active":0,"complete":6,"success":6,"errored":0,"retried":0,"total":6,"elapsed":1857}
+[info] i  hosting: upload complete 
+[info] +  hosting[brightbots-rbt]: file upload complete 
+[debug] [2025-08-11T19:12:14.571Z] [hosting] deploy completed after 2922ms
+[debug] [2025-08-11T19:12:14.571Z] [
+  {
+    "config": {
+      "site": "brightbots-rbt",
+      "public": "build",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "headers": [
+        {
+          "source": "**/*.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "**/*.css",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/index.html",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/service-worker.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**",
+          "headers": [
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "strict-origin-when-cross-origin"
+            },
+            {
+              "key": "Permissions-Policy",
+              "value": "geolocation=(), microphone=(), camera=()"
+            },
+            {
+              "key": "Strict-Transport-Security",
+              "value": "max-age=31536000; includeSubDomains; preload"
+            }
+          ]
+        }
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    "version": "projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199"
+  }
+]
+[info] i  hosting[brightbots-rbt]: finalizing version... 
+[debug] [2025-08-11T19:12:14.573Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:14.573Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:14.574Z] >>> [apiv2][query] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions/6595a610cf830199 updateMask=status%2Cconfig
+[debug] [2025-08-11T19:12:14.574Z] >>> [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions/6595a610cf830199 {"status":"FINALIZED","config":{"rewrites":[{"glob":"**","path":"/index.html"}],"headers":[{"glob":"**/*.js","headers":{"Cache-Control":"public, max-age=31536000, immutable"}},{"glob":"**/*.css","headers":{"Cache-Control":"public, max-age=31536000, immutable"}},{"glob":"**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)","headers":{"Cache-Control":"public, max-age=31536000, immutable"}},{"glob":"/index.html","headers":{"Cache-Control":"no-cache"}},{"glob":"/service-worker.js","headers":{"Cache-Control":"no-cache"}},{"glob":"**","headers":{"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"strict-origin-when-cross-origin","Permissions-Policy":"geolocation=(), microphone=(), camera=()","Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload"}}]}}
+[debug] [2025-08-11T19:12:15.207Z] <<< [apiv2][status] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions/6595a610cf830199 200
+[debug] [2025-08-11T19:12:15.208Z] <<< [apiv2][body] PATCH https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/versions/6595a610cf830199 {"name":"projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199","status":"FINALIZED","config":{"headers":[{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.js"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.css"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)"},{"headers":{"Cache-Control":"no-cache"},"glob":"/index.html"},{"headers":{"Cache-Control":"no-cache"},"glob":"/service-worker.js"},{"headers":{"Permissions-Policy":"geolocation=(), microphone=(), camera=()","Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"strict-origin-when-cross-origin"},"glob":"**"}],"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-08-11T19:12:10.908557Z","createUser":{"email":"dev@brightbots.in"},"finalizeTime":"2025-08-11T19:12:15.010477Z","finalizeUser":{"email":"dev@brightbots.in"}}
+[debug] [2025-08-11T19:12:15.208Z] [hosting] finalized version for brightbots-rbt:[object Object]
+[info] +  hosting[brightbots-rbt]: version finalized 
+[info] i  hosting[brightbots-rbt]: releasing new version... 
+[debug] [2025-08-11T19:12:15.209Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:15.209Z] Checked if tokens are valid: true, expires at: 1754943091617
+[debug] [2025-08-11T19:12:15.209Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/channels/live/releases versionName=projects%2F156822646831%2Fsites%2Fbrightbots-rbt%2Fversions%2F6595a610cf830199
+[debug] [2025-08-11T19:12:15.209Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/channels/live/releases {}
+[debug] [2025-08-11T19:12:15.932Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/channels/live/releases 200
+[debug] [2025-08-11T19:12:15.932Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/brightbots-rbt/channels/live/releases {"name":"projects/156822646831/sites/brightbots-rbt/channels/live/releases/1754939535136000","version":{"name":"projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199","status":"FINALIZED","config":{"headers":[{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.js"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.css"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)"},{"headers":{"Cache-Control":"no-cache"},"glob":"/index.html"},{"headers":{"Cache-Control":"no-cache"},"glob":"/service-worker.js"},{"headers":{"Referrer-Policy":"strict-origin-when-cross-origin","Permissions-Policy":"geolocation=(), microphone=(), camera=()","Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"},"glob":"**"}],"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-08-11T19:12:10.908557Z","createUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"},"finalizeTime":"2025-08-11T19:12:15.010477Z","finalizeUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"}},"type":"DEPLOY","releaseTime":"2025-08-11T19:12:15.136Z","releaseUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"}}
+[debug] [2025-08-11T19:12:15.933Z] [hosting] release: {"name":"projects/156822646831/sites/brightbots-rbt/channels/live/releases/1754939535136000","version":{"name":"projects/156822646831/sites/brightbots-rbt/versions/6595a610cf830199","status":"FINALIZED","config":{"headers":[{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.js"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.css"},{"headers":{"Cache-Control":"public, max-age=31536000, immutable"},"glob":"**/*.@(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)"},{"headers":{"Cache-Control":"no-cache"},"glob":"/index.html"},{"headers":{"Cache-Control":"no-cache"},"glob":"/service-worker.js"},{"headers":{"Referrer-Policy":"strict-origin-when-cross-origin","Permissions-Policy":"geolocation=(), microphone=(), camera=()","Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"},"glob":"**"}],"rewrites":[{"glob":"**","path":"/index.html"}]},"labels":{"deployment-tool":"cli-firebase"},"createTime":"2025-08-11T19:12:10.908557Z","createUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"},"finalizeTime":"2025-08-11T19:12:15.010477Z","finalizeUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"}},"type":"DEPLOY","releaseTime":"2025-08-11T19:12:15.136Z","releaseUser":{"email":"dev@brightbots.in","imageUrl":"https://lh3.googleusercontent.com/a/ACg8ocLueEnwmfFiH30CDPZbSIylctzwxAeAg-W1_zINXkWN1FPolw=mo"}}
+[info] +  hosting[brightbots-rbt]: release complete 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/rbt-app-a30e8/overview
+[info] Hosting URL: https://brightbots-rbt.web.app
